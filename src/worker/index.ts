@@ -24,7 +24,9 @@ import {
   formatRiotId,
   parseRiotId,
   RiotApiError,
-  DEFAULT_RIOT_API_BASE,
+  DEFAULT_RIOT_ACCOUNT_BASE,
+  DEFAULT_RIOT_PLATFORM_BASE,
+  type RiotEndpoints,
 } from "./riot";
 
 const app = new Hono<{ Bindings: Env }>();
@@ -407,9 +409,12 @@ app.post("/api/me/rank/sync", async (c) => {
     return c.json({ error: "저장된 Riot ID 형식이 올바르지 않습니다." }, 400);
 
   let rank;
-  const baseUrl = c.env.RIOT_API_BASE || DEFAULT_RIOT_API_BASE;
+  const endpoints: RiotEndpoints = {
+    accountBase: c.env.RIOT_ACCOUNT_BASE || DEFAULT_RIOT_ACCOUNT_BASE,
+    platformBase: c.env.RIOT_PLATFORM_BASE || DEFAULT_RIOT_PLATFORM_BASE,
+  };
   try {
-    rank = await fetchSoloRank(parsed, apiKey, baseUrl);
+    rank = await fetchSoloRank(parsed, apiKey, endpoints);
   } catch (err) {
     if (err instanceof RiotApiError)
       return c.json({ error: err.message }, err.status);

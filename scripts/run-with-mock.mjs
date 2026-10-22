@@ -69,7 +69,7 @@ const accountMatch = url.pathname.match(
 		return;
 	}
 
-	if (/^\/lol\/summoner\/v4\/summoners\/by-puuid\//.test(url.pathname)) {
+	if (/^\/lol\/summoner\/v1\/summoners\/by-puuid\//.test(url.pathname)) {
 		const puuid = decodeURIComponent(url.pathname.split("/").pop() ?? "");
 		const riotId = [...PUUIDS].find(([, p]) => p === puuid)?.[0];
 		if (!riotId) {

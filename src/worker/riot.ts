@@ -6,13 +6,28 @@
  *   2. Summoner API : puuid -> encryptedSummonerId
  *   3. League API   : encryptedSummonerId -> 랭크 엔트리
  *
- * region(라우팅 값)과 platform은 보통 같지만 KR은 region="kr", platform="KR"이다.
+ * ⚠️ 라우팅 규칙 (Riot 공식 문서 기준) — 헷갈리기 쉬운 부분이다.
+ *
+ *   Account-V1 은 "대륙" 라우팅을 쓴다: AMERICAS / ASIA / EUROPE (+ SEA)
+ *   Summoner/League/Match 는 "플랫폼" 라우팅을 쓴다: kr, na1, euw1 ...
+ *
+ *   즉 KR 계정 조회도 `kr.api...` 가 아니라 `asia.api...` 로 해야 한다.
+ *   `kr.api.riotgames.com` 으로 Account-V1 을 호출하면 403 이 돌아온다.
+ *
+ *   대륙 라우팅: AMERICAS(NA,BR,LAN,LAS) ASIA(KR,JP) EUROPE(EUNE,EUW,ME1,TR,RU) SEA(OC,SG2,TW2,VN2)
  *
  * 테스트를 위해 RIOT_API_BASE로 베이스 URL을 갈아끼울 수 있게 해두었다.
  * (로컬 테스트에서는 scripts/run-with-mock.mjs 를 사용한다)
  */
 
-export const DEFAULT_RIOT_API_BASE = "https://kr.api.riotgames.com";
+/** Account-V1 용 대륙 라우팅 호스트. KR/JP는 ASIA에 속한다. */
+export const DEFAULT_RIOT_ACCOUNT_BASE = "https://asia.api.riotgames.com";
+
+/** Summoner/League-V1 등 플랫폼 API 호스트. */
+export const DEFAULT_RIOT_PLATFORM_BASE = "https://kr.api.riotgames.com";
+
+/** 기존 호환용 별칭. */
+export const DEFAULT_RIOT_API_BASE = DEFAULT_RIOT_PLATFORM_BASE;
 
 /** 조회 대상 큐. 랭킹 게임(5인) 기준. */
 const TARGET_QUEUE = "RANKED_SOLO_5x5";
@@ -99,9 +114,12 @@ async function riotFetch<T>(
 		throw new RiotApiError("Riot API 키가 유효하지 않습니다.", 401);
 	}
 	if (res.status === 403) {
-		// 403은 키가 인식되지만 아직 승인/활성화되지 않은 경우에 발생한다.
+		// Riot 공식 정의: "An invalid API key was provided" 또는 "A blacklisted API key".
+		// 개발 키는 Account-V1(계정 조회)만 허용하고 Summoner/League 같은
+		// 플랫폼 API는 403 을 돌려주는 경우가 있다. 이때는 키 갱신이 아니라
+		// personal/production key 신청이 필요하다.
 		throw new RiotApiError(
-			"Riot API 접근이 아직 승인되지 않았습니다. 개발자 포털에서 키 활성화 상태를 확인해 주세요.",
+			"Riot API 키가 이 엔드포인트에 접근할 수 없습니다. 개발자 포털에서 personal key를 신청하세요.",
 			403,
 		);
 	}
@@ -137,6 +155,18 @@ interface RiotLeagueEntry {
 	leaguePoints?: number;
 }
 
+export interface RiotEndpoints {
+	/** Account-V1 (대륙 라우팅). KR/JP는 asia. */
+	accountBase: string;
+	/** Summoner/League-V1 (플랫폼 라우팅). KR는 kr. */
+	platformBase: string;
+}
+
+export const DEFAULT_ENDPOINTS: RiotEndpoints = {
+	accountBase: DEFAULT_RIOT_ACCOUNT_BASE,
+	platformBase: DEFAULT_RIOT_PLATFORM_BASE,
+};
+
 /**
  * Riot ID로 현재 솔로 랭크를 조회한다.
  * 랭크가 없는 계정(unranked)이나 엔트리가 없으면 null을 반환한다.
@@ -144,28 +174,31 @@ interface RiotLeagueEntry {
 export async function fetchSoloRank(
 	riotId: RiotId,
 	apiKey: string,
-	baseUrl: string = DEFAULT_RIOT_API_BASE,
+	endpoints: RiotEndpoints = DEFAULT_ENDPOINTS,
 ): Promise<RiotRank | null> {
+	// 1단계: Account-V1 (대륙 라우팅) — KR 계정은 asia 호스트를 쓴다.
 	const account = await riotFetch<RiotAccount>(
 		`/riot/account/v1/accounts/by-riot-id/${encodeURIComponent(
 			riotId.gameName,
 		)}/${encodeURIComponent(riotId.tagLine)}`,
 		apiKey,
-		baseUrl,
+		endpoints.accountBase,
 	);
 
+	// 2단계: Summoner-V1 (플랫폼 라우팅) — puuid -> encryptedSummonerId
 	const summoner = await riotFetch<RiotSummoner>(
-		`/lol/summoner/v4/summoners/by-puuid/${encodeURIComponent(account.puuid)}`,
+		`/lol/summoner/v1/summoners/by-puuid/${encodeURIComponent(account.puuid)}`,
 		apiKey,
-		baseUrl,
+		endpoints.platformBase,
 	);
 
+	// 3단계: League-V4 (플랫폼 라우팅) — 랭크 엔트리
 	const entries = await riotFetch<RiotLeagueEntry[]>(
 		`/lol/league/v4/entries/by-summoner/${encodeURIComponent(
 			summoner.encryptedSummonerId,
 		)}`,
 		apiKey,
-		baseUrl,
+		endpoints.platformBase,
 	);
 
 	const target = entries.find((e) => e.queueType === TARGET_QUEUE);

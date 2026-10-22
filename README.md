@@ -49,7 +49,11 @@ npm run dev:mock      # 목 Riot API + dev 서버 동시 실행
 | 이름 | 용도 | 설정 위치 |
 |---|---|---|
 | `RIOT_API_KEY` | Riot API 키 (비밀) | `.dev.vars` (로컬) / `wrangler secret put RIOT_API_KEY` (배포) |
-| `RIOT_API_BASE` | Riot API 베이스 URL | `wrangler.json`의 `vars` (운영) / `wrangler.local.json`의 `vars` (로컬) |
+| `RIOT_ACCOUNT_BASE` | Account-V1 호스트 (대륙 라우팅) | `wrangler.json`의 `vars` (운영) / `wrangler.local.json`의 `vars` (로컬) |
+| `RIOT_PLATFORM_BASE` | Summoner/League 호스트 (플랫폼 라우팅) | 동일 |
+
+> `RIOT_ACCOUNT_BASE` 와 `RIOT_PLATFORM_BASE` 는 **호스트가 다르다.**
+> KR 계정 조회는 `asia`, 랭크 조회는 `kr` 이다. 자세한 내용은 아래 Riot API 참고 섹션 참고.
 
 ### 주의: `.dev.vars` 와 `vars` 는 같은 이름을 공유할 수 없다
 
@@ -159,20 +163,65 @@ rank_entries  (id, user_id, season, tier, division, lp, score, source, updated_a
 
 - 조회 큐는 랭킹 게임(5인) `RANKED_SOLO_5x5` 기준
 - Riot ID 형식: `게임이름#태그` (태그는 한글/영문/숫자, 5자 이하)
-- KR은 region이 `kr`, platform이 `KR`
 - rate limit이 있으므로 주기적 전체 동기화보다 사용자가 누르는 방식이 안전하다
+
+### ⚠️ 라우팅 규칙: Account-V1 과 플랫폼 API 는 호스트가 다르다
+
+Riot 는 두 가지 라우팅을 쓰는데, 헷갈리기 쉽다.
+
+| API 종류 | 라우팅 | KR용 호스트 |
+|---|---|---|
+| Account-V1 (puuid 조회) | **대륙**: AMERICAS / ASIA / EUROPE / SEA | `asia.api.riotgames.com` |
+| Summoner-V1, League-V4, Match-V5 | **플랫폼**: kr, na1, euw1 … | `kr.api.riotgames.com` |
+
+대륙 매핑: AMERICAS(NA,BR,LAN,LAS) ASIA(KR,JP) EUROPE(EUNE,EUW,ME1,TR,RU) SEA(OC,SG2,TW2,VN2)
+
+**`kr.api.riotgames.com` 으로 Account-V1 을 호출하면 403 이 돌아온다.**
+(공식 문서상 Account-V1 에는 `kr` 라우팅 값이 없다)
+
+그래서 환경변수를 두 개로 나눴다.
+
+| 변수 | 기본값 | 용도 |
+|---|---|---|
+| `RIOT_ACCOUNT_BASE` | `https://asia.api.riotgames.com` | Account-V1 (계정/PUUID 조회) |
+| `RIOT_PLATFORM_BASE` | `https://kr.api.riotgames.com` | Summoner-V1 / League-V4 (랭크 조회) |
+
+### ⚠️ 개발 키로는 랭크 조회가 막힌다
+
+실측 결과(2026-10-22, 개발 키):
+
+| 엔드포인트 | 결과 |
+|---|---|
+| `account-v1` by-riot-id / by-puuid | **200 정상** |
+| `champion-mastery-v4` by-puuid | **200 정상** |
+| `summoner-v1` by-puuid | 403 |
+| `league-v4` entries | 403 |
+| `match-v5` | 403 |
+
+Riot 공식 이슈(developer-relations #677, #1090)에서도 동일 증상이 보고된다.
+"Dev API key returns 403 Forbidden on all endpoints" 라는 제목의 이슈가 열려 있고,
+해결책으로 **개발 키가 아니라 앱에 연결된 키**를 쓰라고 안내한다.
+
+```
+개발자 포털 → 프로필 → Apps → [내 앱] → API Keys 탭
+```
+
+**즉 랭크 자동 동기화를 쓰려면 아래 중 하나가 필요하다.**
+
+1. **Personal Key 신청** (권장)
+   - 포털에서 "Register Project" → 앱 설명 작성
+   - **검증 절차 없이** 발급된다. Standard API(Summoner/League) 접근 가능.
+   - rate limit: 1초당 20 req, 2분당 100 req
+   - 단, "public consumption"(공개 서비스)에는 personal key 사용 불가 → 학교 내부용으로 운영
+2. **Production Key 신청**
+   - 동작하는 사이트 + `riot.txt` 도메인 검증 필요
+   - 리뷰는 주간 단위, 최대 3주
+   - 공개 서비스 운영 시 필수
 
 ### 개발 키는 24시간마다 만료된다
 
 Riot 공식 문서 기준, 개발자 포털에서 받는 **development API key는 24시간마다 비활성화**된다.
 매일 포털에서 키를 새로 발급받아 `RIOT_API_KEY`를 갱신해야 한다.
-실서비스를 공개하려면 production key를 신청해야 하며, 아래는 신청 요건이다.
-
-- **Personal key**: 개인 프로젝트/프로토타입용. 비교적 간단히 발급된다.
-- **Production key**: 실제 서비스 공개용. **동작하는 웹사이트가 있어야** 승인된다.
-  - 사이트 도메인 소유권 증명을 위한 `riot.txt` 업로드가 필요하다.
-  - 리뷰는 주간 단위로 진행되며, 최대 3주가 걸릴 수 있다.
-  - rate limit이 personal key보다 훨씬 높다 (10초당 500 req).
 
 ### 학교 와이파이에서 Riot API가 막히는 경우
 
@@ -181,11 +230,12 @@ curl exit 35) 키 문제가 아니라 **네트워크 차단**이다. 확인할 �
 
 ```bash
 curl -s -w "HTTP=%{http_code}\n" -H "X-Riot-Token: $RIOT_API_KEY" \
-  "https://kr.api.riotgames.com/riot/account/v1/accounts/by-riot-id/hide/onbush"
+  "https://asia.api.riotgames.com/riot/account/v1/accounts/by-riot-id/Hide/KR1"
 ```
 
+- `HTTP=200` → 네트워크 정상, 키 유효
 - `HTTP=401 Unknown apikey` → 키가 만료되었거나 아직 인식되지 않음. 포털에서 재발급.
-- `HTTP=403 Forbidden` → 키는 인식되지만 아직 승인/활성화 대기 중.
+- `HTTP=403 Forbidden` → 키에 해당 엔드포인트 권한이 없음. Personal/Production key 필요.
 - `curl exit 35` / `HTTP=000` → **네트워크 차단**. 학교 와이파이가 riotgames.com을 막은 경우.
 
 이 경우 세 가지 대안이 있다.

@@ -28,6 +28,7 @@
     ]
   },
   "vars": {
-    "RIOT_API_BASE": "https://kr.api.riotgames.com"
+    "RIOT_ACCOUNT_BASE": "https://asia.api.riotgames.com",
+    "RIOT_PLATFORM_BASE": "https://kr.api.riotgames.com"
   }
 }

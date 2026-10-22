@@ -21,7 +21,10 @@ const base = JSON.parse(
 const MOCK_RIOT_PORT = process.env.MOCK_RIOT_PORT ?? "8787";
 
 // Vite dev 서버가 IPv4로도 떠야 workerd가 127.0.0.1로 접근할 수 있다.
-base.vars = { RIOT_API_BASE: `http://127.0.0.1:5173/mock-riot` };
+base.vars = {
+	RIOT_ACCOUNT_BASE: `http://127.0.0.1:5173/mock-riot`,
+	RIOT_PLATFORM_BASE: `http://127.0.0.1:5173/mock-riot`,
+};
 
 const outPath = path.join(projectRoot, "wrangler.local.json");
 fs.writeFileSync(outPath, JSON.stringify(base, null, 2) + "\n");
@@ -34,6 +37,7 @@ for (const addrs of Object.values(os.networkInterfaces())) {
 }
 
 console.log("wrangler.local.json 생성 완료");
-console.log("  RIOT_API_BASE =", base.vars.RIOT_API_BASE);
+console.log("  RIOT_ACCOUNT_BASE =", base.vars.RIOT_ACCOUNT_BASE);
+console.log("  RIOT_PLATFORM_BASE =", base.vars.RIOT_PLATFORM_BASE);
 console.log("  (목 서버는 0.0.0.0:" + MOCK_RIOT_PORT + " 에 바인딩)");
 if (ips.length) console.log("  호스트 IP:", ips.join(", "));
