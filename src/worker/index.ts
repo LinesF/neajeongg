@@ -19,6 +19,13 @@ import {
   TIER_LABELS,
   type Tier,
 } from "./rank";
+import {
+  fetchSoloRank,
+  formatRiotId,
+  parseRiotId,
+  RiotApiError,
+  DEFAULT_RIOT_API_BASE,
+} from "./riot";
 
 const app = new Hono<{ Bindings: Env }>();
 
@@ -122,12 +129,25 @@ app.post("/api/auth/register", async (c) => {
     password?: string;
     schoolName?: string;
     joinCode?: string;
+    riotId?: string;
   }>();
 
   const nickname = (body.nickname ?? "").trim();
   const password = body.password ?? "";
   const schoolName = (body.schoolName ?? "").trim();
   const joinCode = (body.joinCode ?? "").trim().toUpperCase();
+  const riotIdInput = (body.riotId ?? "").trim();
+
+  let riotId: string | null = null;
+  if (riotIdInput) {
+    const parsed = parseRiotId(riotIdInput);
+    if (!parsed)
+      return c.json(
+        { error: "Riot ID는 '게임이름#태그' 형식이어야 합니다." },
+        400,
+      );
+    riotId = formatRiotId(parsed);
+  }
 
   const nickErr = nicknameError(nickname);
   if (nickErr) return c.json({ error: nickErr }, 400);
@@ -184,6 +204,7 @@ app.post("/api/auth/register", async (c) => {
     .insert(users)
     .values({
       nickname,
+      riotId,
       passwordHash: serializePassword(stored),
       passwordSalt: stored.salt,
       schoolId,
@@ -286,6 +307,7 @@ app.get("/api/me", async (c) => {
     .select({
       id: users.id,
       nickname: users.nickname,
+      riotId: users.riotId,
       schoolId: schools.id,
       schoolName: schools.name,
     })
@@ -311,6 +333,7 @@ app.get("/api/me", async (c) => {
     user: {
       id: rows[0].id,
       nickname: rows[0].nickname,
+      riotId: rows[0].riotId,
       schoolId: rows[0].schoolId,
       schoolName: rows[0].schoolName,
     },
@@ -319,6 +342,7 @@ app.get("/api/me", async (c) => {
           tier: rank[0].tier,
           division: rank[0].division,
           lp: rank[0].lp,
+          source: rank[0].source,
           updatedAt: rank[0].updatedAt,
         }
       : null,
@@ -370,6 +394,113 @@ app.put("/api/me/rank", async (c) => {
     });
 
   return c.json({ ok: true, score });
+});
+
+// ---------------------------------------------------------------- riot sync
+
+/**
+ * Riot API로 실제 랭크를 조회해 순위를 갱신한다.
+ * 수동 입력보다 신뢰도가 높으므로 source를 'riot'으로 기록한다.
+ */
+app.post("/api/me/rank/sync", async (c) => {
+  const userId = await currentUserId(c);
+  if (!userId) return c.json({ error: "로그인이 필요합니다." }, 401);
+
+  const apiKey = c.env.RIOT_API_KEY;
+  if (!apiKey)
+    return c.json(
+      { error: "Riot API 키가 설정되지 않았습니다. 수동으로 랭크를 입력해 주세요." },
+      503,
+    );
+
+  const db = createDb(c.env);
+  const rows = await db
+    .select({ riotId: users.riotId })
+    .from(users)
+    .where(eq(users.id, userId))
+    .limit(1);
+
+  const riotId = rows[0]?.riotId;
+  if (!riotId)
+    return c.json(
+      { error: "등록된 Riot ID가 없습니다. 계정에서 Riot ID를 먼저 입력해 주세요." },
+      400,
+    );
+
+  const parsed = parseRiotId(riotId);
+  if (!parsed)
+    return c.json({ error: "저장된 Riot ID 형식이 올바르지 않습니다." }, 400);
+
+  let rank;
+  const baseUrl = c.env.RIOT_API_BASE || DEFAULT_RIOT_API_BASE;
+  try {
+    rank = await fetchSoloRank(parsed, apiKey, baseUrl);
+  } catch (err) {
+    if (err instanceof RiotApiError)
+      return c.json({ error: err.message }, err.status);
+    return c.json({ error: "Riot API 호출에 실패했습니다." }, 502);
+  }
+
+  if (!rank)
+    return c.json(
+      { error: "랭크 정보를 찾을 수 없습니다. 랭크가 있는 계정인지 확인해 주세요." },
+      404,
+    );
+
+  const tier = rank.tier as Tier;
+  const division = normalizeDivision(tier, rank.division);
+  if (division === "invalid")
+    return c.json({ error: "Riot API에서 잘못된 디비전 값이 왔습니다." }, 502);
+
+  const score = computeScore(tier, division, rank.lp);
+  await db
+    .insert(rankEntries)
+    .values({
+      userId,
+      season: CURRENT_SEASON,
+      tier,
+      division,
+      lp: rank.lp,
+      score,
+      source: "riot",
+      updatedAt: new Date(),
+    })
+    .onConflictDoUpdate({
+      target: [rankEntries.userId, rankEntries.season],
+      set: {
+        tier,
+        division,
+        lp: rank.lp,
+        score,
+        source: "riot",
+        updatedAt: new Date(),
+      },
+    });
+
+  return c.json({
+    ok: true,
+    rank: { tier, division, lp: rank.lp, display: formatRank(tier, division, rank.lp) },
+    score,
+  });
+});
+
+/** Riot ID 등록/변경 */
+app.put("/api/me/riot-id", async (c) => {
+  const userId = await currentUserId(c);
+  if (!userId) return c.json({ error: "로그인이 필요합니다." }, 401);
+
+  const body = await c.req.json<{ riotId?: string }>();
+  const parsed = parseRiotId((body.riotId ?? "").trim());
+  if (!parsed)
+    return c.json(
+      { error: "Riot ID는 '게임이름#태그' 형식이어야 합니다." },
+      400,
+    );
+
+  const riotId = formatRiotId(parsed);
+  const db = createDb(c.env);
+  await db.update(users).set({ riotId }).where(eq(users.id, userId));
+  return c.json({ ok: true, riotId });
 });
 
 // ---------------------------------------------------------------- leaderboard

@@ -46,7 +46,8 @@
     "db:generate": "drizzle-kit generate",
     "db:migrate:local": "wrangler d1 migrations apply DB --local",
     "db:migrate:remote": "wrangler d1 migrations apply DB --remote",
-    "typecheck": "tsc -b"
+    "typecheck": "tsc -b",
+    "dev:mock": "node scripts/run-with-mock.mjs"
   },
   "type": "module",
   "allowScripts": {

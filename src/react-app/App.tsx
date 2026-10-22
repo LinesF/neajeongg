@@ -66,6 +66,14 @@ type Me = {
 	schoolRank: number | null;
 };
 
+type MyUser = {
+	id: number;
+	nickname: string;
+	riotId: string | null;
+	schoolId: number;
+	schoolName: string;
+};
+
 async function api<T>(path: string, init?: RequestInit): Promise<T> {
 	const res = await fetch(path, {
 		...init,
@@ -83,6 +91,7 @@ export default function App() {
 		"leaderboard",
 	);
 	const [me, setMe] = useState<Me | null>(null);
+	const [myUser, setMyUser] = useState<MyUser | null>(null);
 	const [myUserId, setMyUserId] = useState<number | null>(null);
 	const [schools, setSchools] = useState<SchoolSummary[]>([]);
 	const [selectedSchool, setSelectedSchool] = useState<number | null>(null);
@@ -105,10 +114,12 @@ export default function App() {
 		}
 
 		try {
-			const data = await api<{ user: { id: number } }>("/api/me");
+			const data = await api<{ user: MyUser }>("/api/me");
 			setMyUserId(data.user.id);
+			setMyUser(data.user);
 		} catch {
 			setMyUserId(null);
+			setMyUser(null);
 		}
 	}, []);
 
@@ -275,6 +286,7 @@ export default function App() {
 			{tab === "rank" && (
 				<RankForm
 					me={me}
+					user={myUser}
 					onSaved={async () => {
 						await loadSession();
 						setDataVersion((v) => v + 1);
@@ -294,19 +306,28 @@ export default function App() {
 
 function RankForm({
 	me,
+	user,
 	onSaved,
 }: {
 	me: Me | null;
+	user: MyUser | null;
 	onSaved: () => Promise<void>;
 }) {
 	const [tier, setTier] = useState<Tier>("GOLD");
 	const [division, setDivision] = useState(3);
 	const [lp, setLp] = useState(50);
+	const [riotId, setRiotId] = useState(user?.riotId ?? "");
 	const [error, setError] = useState<string | null>(null);
 	const [saved, setSaved] = useState(false);
 	const [busy, setBusy] = useState(false);
+	const [syncing, setSyncing] = useState(false);
 
 	const needsDivision = DIVISION_TIERS.includes(tier);
+
+	// 외부에서 Riot ID가 바뀌면 입력칸을 동기화한다.
+	useEffect(() => {
+		setRiotId(user?.riotId ?? "");
+	}, [user?.riotId]);
 
 	if (!me) {
 		return (
@@ -314,6 +335,22 @@ function RankForm({
 				<p className="empty">로그인 후 랭크를 등록할 수 있습니다.</p>
 			</div>
 		);
+	}
+
+	async function saveRiotId(): Promise<boolean> {
+		const value = riotId.trim();
+		if (!value) return true;
+		if (value === (user?.riotId ?? "")) return true;
+		try {
+			await api("/api/me/riot-id", {
+				method: "PUT",
+				body: JSON.stringify({ riotId: value }),
+			});
+			return true;
+		} catch (err) {
+			setError((err as Error).message);
+			return false;
+		}
 	}
 
 	async function submit(e: React.FormEvent) {
@@ -338,8 +375,29 @@ function RankForm({
 		}
 	}
 
+	/** Riot API로 실제 랭크를 조회해 순위를 갱신한다. */
+	async function syncFromRiot() {
+		setSyncing(true);
+		setError(null);
+		setSaved(false);
+		try {
+			if (!(await saveRiotId())) return;
+			const res = await api<{ rank: { display: string } }>(
+				"/api/me/rank/sync",
+				{ method: "POST" },
+			);
+			setSaved(true);
+			await onSaved();
+			alert(`Riot API에서 랭크를 가져왔습니다: ${res.rank.display}`);
+		} catch (err) {
+			setError((err as Error).message);
+		} finally {
+			setSyncing(false);
+		}
+	}
+
 	return (
-		<div className="card" style={{ maxWidth: 480 }}>
+		<div className="card" style={{ maxWidth: 520 }}>
 			<h2>내 랭크 등록</h2>
 			<p className="muted" style={{ marginTop: 0 }}>
 				{me.schoolName} · 현재 {me.ranked ? `${me.schoolRank}위` : "랭크 미등록"}
@@ -348,6 +406,29 @@ function RankForm({
 				<div className="notice">랭크가 저장되었습니다. 순위표를 확인하세요.</div>
 			)}
 			{error && <div className="error">{error}</div>}
+
+			<div className="field">
+				<label htmlFor="riot">Riot ID (게임이름#태그)</label>
+				<input
+					id="riot"
+					value={riotId}
+					onChange={(e) => setRiotId(e.target.value)}
+					placeholder="예: Hide#KR1"
+				/>
+				<p className="muted" style={{ margin: "0.35rem 0 0" }}>
+					Riot API로 실제 랭크를 자동으로 가져옵니다.
+				</p>
+			</div>
+			<button
+				type="button"
+				onClick={syncFromRiot}
+				disabled={syncing || !riotId.trim()}
+				style={{ width: "100%", marginBottom: "1.5rem" }}
+			>
+				{syncing ? "Riot API 조회 중…" : "Riot API로 랭크 가져오기"}
+			</button>
+
+			<h3>또는 직접 입력</h3>
 			<form onSubmit={submit}>
 				<div className="field">
 					<label htmlFor="tier">티어</label>
@@ -391,7 +472,7 @@ function RankForm({
 					/>
 				</div>
 				<button className="primary" type="submit" disabled={busy}>
-					{busy ? "저장 중…" : "저장"}
+					{busy ? "저장 중…" : "직접 입력 저장"}
 				</button>
 			</form>
 		</div>
@@ -404,6 +485,7 @@ function AuthPanel({ onDone }: { onDone: () => Promise<void> }) {
 	const [password, setPassword] = useState("");
 	const [schoolName, setSchoolName] = useState("");
 	const [joinCode, setJoinCode] = useState("");
+	const [riotId, setRiotId] = useState("");
 	const [error, setError] = useState<string | null>(null);
 	const [issuedCode, setIssuedCode] = useState<string | null>(null);
 	const [busy, setBusy] = useState(false);
@@ -422,6 +504,7 @@ function AuthPanel({ onDone }: { onDone: () => Promise<void> }) {
 						password,
 						schoolName,
 						joinCode: joinCode || undefined,
+						riotId: riotId || undefined,
 					}),
 				});
 				if (res.joinCode) {
@@ -430,6 +513,7 @@ function AuthPanel({ onDone }: { onDone: () => Promise<void> }) {
 					setSchoolName("");
 					setNickname("");
 					setPassword("");
+					setRiotId("");
 				}
 			} else {
 				await api("/api/auth/login", {
@@ -514,6 +598,18 @@ function AuthPanel({ onDone }: { onDone: () => Promise<void> }) {
 								onChange={(e) => setJoinCode(e.target.value.toUpperCase())}
 								placeholder="ABCD-1234"
 							/>
+						</div>
+						<div className="field">
+							<label htmlFor="regriot">Riot ID (선택, 게임이름#태그)</label>
+							<input
+								id="regriot"
+								value={riotId}
+								onChange={(e) => setRiotId(e.target.value)}
+								placeholder="예: Hide#KR1"
+							/>
+							<p className="muted" style={{ margin: "0.35rem 0 0" }}>
+								입력하면 실제 랭크를 자동으로 조회할 수 있습니다.
+							</p>
 						</div>
 					</>
 				)}

@@ -3,7 +3,9 @@
   "name": "lol-school-rank",
   "main": "./src/worker/index.ts",
   "compatibility_date": "2026-08-18",
-  "compatibility_flags": ["nodejs_compat"],
+  "compatibility_flags": [
+    "nodejs_compat"
+  ],
   "observability": {
     "enabled": true
   },
@@ -19,5 +21,13 @@
       "database_id": "00000000-0000-0000-0000-000000000000",
       "migrations_dir": "migrations"
     }
-  ]
+  ],
+  "secrets": {
+    "required": [
+      "RIOT_API_KEY"
+    ]
+  },
+  "vars": {
+    "RIOT_API_BASE": "https://kr.api.riotgames.com"
+  }
 }

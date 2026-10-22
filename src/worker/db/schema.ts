@@ -23,6 +23,8 @@ export const users = sqliteTable(
   {
     id: integer("id").primaryKey({ autoIncrement: true }),
     nickname: text("nickname").notNull(),
+    // Riot ID (gameName#tagLine). 랭크 자동 동기화에 사용한다.
+    riotId: text("riot_id"),
     passwordHash: text("password_hash").notNull(),
     passwordSalt: text("password_salt").notNull(),
     schoolId: integer("school_id")
