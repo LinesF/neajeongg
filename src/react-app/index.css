@@ -1,0 +1,387 @@
+:root {
+	--bg: #0a0e1a;
+	--panel: #141a2a;
+	--panel-2: #1b2236;
+	--border: #263049;
+	--text: #e8ecf6;
+	--muted: #8b96b3;
+	--accent: #4f8cff;
+	--accent-soft: rgba(79, 140, 255, 0.14);
+	--gold: #f0b429;
+	--silver: #c9d1e0;
+	--bronze: #c98b5e;
+	--danger: #ff6b6b;
+	--ok: #38d39f;
+
+	color-scheme: dark;
+	font-family: "Pretendard", -apple-system, BlinkMacSystemFont, "Segoe UI",
+		"Apple SD Gothic Neo", "Malgun Gothic", system-ui, sans-serif;
+	font-synthesis: none;
+	text-rendering: optimizeLegibility;
+	-webkit-font-smoothing: antialiased;
+}
+
+* {
+	box-sizing: border-box;
+}
+
+body {
+	margin: 0;
+	background: var(--bg);
+	color: var(--text);
+	min-width: 320px;
+	min-height: 100vh;
+}
+
+h1,
+h2,
+h3 {
+	margin: 0;
+	line-height: 1.25;
+}
+
+a {
+	color: var(--accent);
+	text-decoration: none;
+}
+
+button {
+	font-family: inherit;
+	font-size: 0.95rem;
+	font-weight: 600;
+	border-radius: 10px;
+	border: 1px solid var(--border);
+	padding: 0.65rem 1.1rem;
+	background: var(--panel-2);
+	color: var(--text);
+	cursor: pointer;
+	transition: border-color 0.15s, background 0.15s, opacity 0.15s;
+}
+
+button:hover:not(:disabled) {
+	border-color: var(--accent);
+	background: var(--accent-soft);
+}
+
+button:disabled {
+	opacity: 0.55;
+	cursor: not-allowed;
+}
+
+button.primary {
+	background: var(--accent);
+	border-color: var(--accent);
+	color: #fff;
+}
+
+button.primary:hover:not(:disabled) {
+	background: #3f7af0;
+}
+
+input,
+select {
+	font-family: inherit;
+	font-size: 0.95rem;
+	width: 100%;
+	padding: 0.65rem 0.8rem;
+	border-radius: 10px;
+	border: 1px solid var(--border);
+	background: #0f1422;
+	color: var(--text);
+}
+
+input:focus,
+select:focus {
+	outline: none;
+	border-color: var(--accent);
+}
+
+label {
+	display: block;
+	font-size: 0.82rem;
+	color: var(--muted);
+	margin-bottom: 0.35rem;
+}
+
+.field {
+	margin-bottom: 0.9rem;
+}
+
+.error {
+	background: rgba(255, 107, 107, 0.12);
+	border: 1px solid rgba(255, 107, 107, 0.4);
+	color: #ffb3b3;
+	padding: 0.7rem 0.9rem;
+	border-radius: 10px;
+	font-size: 0.9rem;
+	margin-bottom: 1rem;
+}
+
+.notice {
+	background: rgba(56, 211, 159, 0.12);
+	border: 1px solid rgba(56, 211, 159, 0.4);
+	color: #9ff0d0;
+	padding: 0.8rem 0.9rem;
+	border-radius: 10px;
+	font-size: 0.9rem;
+	margin-bottom: 1rem;
+}
+
+.notice code {
+	font-size: 1.05rem;
+	font-weight: 700;
+	letter-spacing: 0.08em;
+	color: #fff;
+}
+
+.shell {
+	max-width: 1100px;
+	margin: 0 auto;
+	padding: 1.5rem 1rem 4rem;
+}
+
+header.top {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 1rem;
+	flex-wrap: wrap;
+	padding: 0.75rem 0 1.5rem;
+	border-bottom: 1px solid var(--border);
+	margin-bottom: 1.5rem;
+}
+
+.brand {
+	display: flex;
+	align-items: center;
+	gap: 0.65rem;
+}
+
+.brand .logo {
+	width: 36px;
+	height: 36px;
+	border-radius: 9px;
+	background: linear-gradient(135deg, #4f8cff, #a05bff);
+	display: grid;
+	place-items: center;
+	font-weight: 800;
+	font-size: 0.95rem;
+}
+
+.brand h1 {
+	font-size: 1.15rem;
+}
+
+.brand p {
+	margin: 0;
+	font-size: 0.78rem;
+	color: var(--muted);
+}
+
+.grid {
+	display: grid;
+	gap: 1.25rem;
+}
+
+.grid.two {
+	grid-template-columns: minmax(0, 1fr) minmax(0, 1.35fr);
+}
+
+@media (max-width: 860px) {
+	.grid.two {
+		grid-template-columns: minmax(0, 1fr);
+	}
+}
+
+.card {
+	background: var(--panel);
+	border: 1px solid var(--border);
+	border-radius: 14px;
+	padding: 1.25rem;
+}
+
+.card h2 {
+	font-size: 1.05rem;
+	margin-bottom: 1rem;
+}
+
+.card h3 {
+	font-size: 0.9rem;
+	margin-bottom: 0.6rem;
+	color: var(--muted);
+	font-weight: 600;
+}
+
+.tabs {
+	display: flex;
+	gap: 0.5rem;
+	margin-bottom: 1.25rem;
+	flex-wrap: wrap;
+}
+
+.tabs button {
+	background: transparent;
+	border-color: transparent;
+	color: var(--muted);
+}
+
+.tabs button.active {
+	background: var(--accent-soft);
+	border-color: var(--accent);
+	color: var(--text);
+}
+
+table {
+	width: 100%;
+	border-collapse: collapse;
+	font-size: 0.9rem;
+}
+
+th {
+	text-align: left;
+	font-size: 0.76rem;
+	text-transform: uppercase;
+	letter-spacing: 0.05em;
+	color: var(--muted);
+	font-weight: 600;
+	padding: 0.5rem 0.6rem;
+	border-bottom: 1px solid var(--border);
+}
+
+td {
+	padding: 0.65rem 0.6rem;
+	border-bottom: 1px solid rgba(38, 48, 73, 0.6);
+}
+
+tbody tr:last-child td {
+	border-bottom: none;
+}
+
+tbody tr.me {
+	background: var(--accent-soft);
+}
+
+.rank-num {
+	font-variant-numeric: tabular-nums;
+	font-weight: 700;
+	color: var(--muted);
+	width: 2.5rem;
+}
+
+.rank-1 {
+	color: var(--gold);
+}
+.rank-2 {
+	color: var(--silver);
+}
+.rank-3 {
+	color: var(--bronze);
+}
+
+.badge {
+	display: inline-block;
+	padding: 0.15rem 0.5rem;
+	border-radius: 999px;
+	font-size: 0.75rem;
+	font-weight: 700;
+	background: var(--panel-2);
+	border: 1px solid var(--border);
+}
+
+.tier-IRON {
+	color: #a8b3c7;
+}
+.tier-BRONZE {
+	color: var(--bronze);
+}
+.tier-SILVER {
+	color: var(--silver);
+}
+.tier-GOLD {
+	color: var(--gold);
+}
+.tier-PLATINUM {
+	color: #4fd1c5;
+}
+.tier-EMERALD {
+	color: #38d39f;
+}
+.tier-DIAMOND {
+	color: #74a9ff;
+}
+.tier-MASTER {
+	color: #c77dff;
+}
+.tier-GRANDMASTER {
+	color: #ff7b7b;
+}
+.tier-CHALLENGER {
+	color: #ffd700;
+}
+
+.row {
+	display: flex;
+	gap: 0.6rem;
+}
+
+.row > * {
+	flex: 1;
+}
+
+.muted {
+	color: var(--muted);
+	font-size: 0.85rem;
+}
+
+.stat {
+	display: flex;
+	flex-direction: column;
+	gap: 0.15rem;
+	margin-bottom: 1rem;
+}
+
+.stat .value {
+	font-size: 1.6rem;
+	font-weight: 800;
+	font-variant-numeric: tabular-nums;
+}
+
+.stat .label {
+	font-size: 0.78rem;
+	color: var(--muted);
+}
+
+.school-list {
+	display: flex;
+	flex-direction: column;
+	gap: 0.5rem;
+}
+
+.school-item {
+	display: flex;
+	justify-content: space-between;
+	align-items: center;
+	gap: 0.75rem;
+	padding: 0.7rem 0.85rem;
+	background: var(--panel-2);
+	border: 1px solid var(--border);
+	border-radius: 10px;
+	font-size: 0.9rem;
+}
+
+.school-item.selected {
+	border-color: var(--accent);
+	background: var(--accent-soft);
+}
+
+.school-item button {
+	padding: 0.35rem 0.7rem;
+	font-size: 0.8rem;
+}
+
+.empty {
+	color: var(--muted);
+	font-size: 0.9rem;
+	padding: 1.5rem 0;
+	text-align: center;
+}
