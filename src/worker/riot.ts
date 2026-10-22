@@ -71,7 +71,7 @@ function parseDivision(value: string | undefined): number | null {
 }
 
 /** Hono의 c.json(..., status) 가 받는 HTTP 상태 코드만 허용한다. */
-export type RiotErrorStatus = 400 | 401 | 404 | 429 | 502 | 503;
+export type RiotErrorStatus = 400 | 401 | 403 | 404 | 429 | 502 | 503;
 
 export class RiotApiError extends Error {
 	constructor(
@@ -97,6 +97,13 @@ async function riotFetch<T>(
 	}
 	if (res.status === 401) {
 		throw new RiotApiError("Riot API 키가 유효하지 않습니다.", 401);
+	}
+	if (res.status === 403) {
+		// 403은 키가 인식되지만 아직 승인/활성화되지 않은 경우에 발생한다.
+		throw new RiotApiError(
+			"Riot API 접근이 아직 승인되지 않았습니다. 개발자 포털에서 키 활성화 상태를 확인해 주세요.",
+			403,
+		);
 	}
 	if (res.status === 429) {
 		throw new RiotApiError(
