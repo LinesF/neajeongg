@@ -9,7 +9,7 @@
  * region(라우팅 값)과 platform은 보통 같지만 KR은 region="kr", platform="KR"이다.
  *
  * 테스트를 위해 RIOT_API_BASE로 베이스 URL을 갈아끼울 수 있게 해두었다.
- * (로컬 테스트에서는 scripts/mock-riot.mjs 를 사용한다)
+ * (로컬 테스트에서는 scripts/run-with-mock.mjs 를 사용한다)
  */
 
 export const DEFAULT_RIOT_API_BASE = "https://kr.api.riotgames.com";
