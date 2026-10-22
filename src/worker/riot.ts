@@ -144,13 +144,14 @@ interface RiotAccount {
 	puuid: string;
 }
 
-interface RiotSummoner {
-	encryptedSummonerId: string;
-}
-
 interface RiotLeagueEntry {
 	queueType: string;
 	tier?: string;
+	/**
+	 * 디비전. 새 API 스키마에서는 `rank` 필드로 오고("I","II","III","IV"),
+	 * 구버전에서는 `division` 필드로 온다. 둘 다 처리한다.
+	 */
+	rank?: string;
 	division?: string;
 	leaguePoints?: number;
 }
@@ -158,7 +159,7 @@ interface RiotLeagueEntry {
 export interface RiotEndpoints {
 	/** Account-V1 (대륙 라우팅). KR/JP는 asia. */
 	accountBase: string;
-	/** Summoner/League-V1 (플랫폼 라우팅). KR는 kr. */
+	/** League-V4 (플랫폼 라우팅). KR는 kr. */
 	platformBase: string;
 }
 
@@ -170,6 +171,12 @@ export const DEFAULT_ENDPOINTS: RiotEndpoints = {
 /**
  * Riot ID로 현재 솔로 랭크를 조회한다.
  * 랭크가 없는 계정(unranked)이나 엔트리가 없으면 null을 반환한다.
+ *
+ * ⚠️ 엔드포인트 선택이 중요하다.
+ *   `league/v4/entries/by-summoner/{summonerId}` 는 403 이고,
+ *   `league/v4/entries/by-puuid/{puuid}` 는 200 이다.
+ *   즉 encryptedSummonerId 를 얻는 Summoner 단계를 아예 건너뛸 수 있다.
+ *   (puuid 기반 엔드포인트만 접근 가능한 키가 많다)
  */
 export async function fetchSoloRank(
 	riotId: RiotId,
@@ -185,18 +192,9 @@ export async function fetchSoloRank(
 		endpoints.accountBase,
 	);
 
-	// 2단계: Summoner-V1 (플랫폼 라우팅) — puuid -> encryptedSummonerId
-	const summoner = await riotFetch<RiotSummoner>(
-		`/lol/summoner/v1/summoners/by-puuid/${encodeURIComponent(account.puuid)}`,
-		apiKey,
-		endpoints.platformBase,
-	);
-
-	// 3단계: League-V4 (플랫폼 라우팅) — 랭크 엔트리
+	// 2단계: League-V4 (플랫폼 라우팅) — puuid 로 바로 랭크를 조회한다.
 	const entries = await riotFetch<RiotLeagueEntry[]>(
-		`/lol/league/v4/entries/by-summoner/${encodeURIComponent(
-			summoner.encryptedSummonerId,
-		)}`,
+		`/lol/league/v4/entries/by-puuid/${encodeURIComponent(account.puuid)}`,
 		apiKey,
 		endpoints.platformBase,
 	);
@@ -205,7 +203,8 @@ export async function fetchSoloRank(
 	if (!target || !target.tier) return null;
 
 	const tier = target.tier.toUpperCase() as RiotTier;
-	const division = parseDivision(target.division);
+	// 새 스키마는 `rank`, 구버전은 `division` 에 디비전을 담는다.
+	const division = parseDivision(target.rank ?? target.division);
 	const lp = target.leaguePoints ?? 0;
 
 	return { tier, division, lp };

@@ -110,6 +110,12 @@ npx wrangler secret put RIOT_API_KEY
 
 6. 커스텀 도메인은 Cloudflare 네임서버를 쓰는 존에 붙일 수 있다.
 
+> **주의**: 개발 키는 24시간마다 만료되므로, 키가 expire되면 랭크 동기화가 401로 실패한다.
+> 포털에서 새 키를 받아 `wrangler secret put RIOT_API_KEY` 로 갱신하면 된다.
+>
+> **또한 현재 저장소에는 개발 중 만든 테스트 계정 데이터가 남아 있을 수 있다.**
+> 실사용 전에 로컬 D1 데이터를 정리하거나(아래), 운영 DB를 새로 생성하는 것을 권장한다.
+
 ## 학교: 김천고등학교 단일 운영
 
 현재 **김천고등학교 한 곳만** 운영하는 구조다. 학교 선택 UI와 참가 코드는 제거했다.
@@ -186,37 +192,88 @@ Riot 는 두 가지 라우팅을 쓰는데, 헷갈리기 쉽다.
 | `RIOT_ACCOUNT_BASE` | `https://asia.api.riotgames.com` | Account-V1 (계정/PUUID 조회) |
 | `RIOT_PLATFORM_BASE` | `https://kr.api.riotgames.com` | Summoner-V1 / League-V4 (랭크 조회) |
 
-### ⚠️ 개발 키로는 랭크 조회가 막힌다
+### ⚠️ 개발 키로도 랭크 조회가 가능하다 (2026-10-22 확인)
 
-실측 결과(2026-10-22, 개발 키):
+**이전 조사 결론이 바뀌었다.** 같은 개발 키로 실측한 결과다.
 
-| 엔드포인트 | 결과 |
+| 엔드포인트 | 상태 |
 |---|---|
-| `account-v1` by-riot-id / by-puuid | **200 정상** |
-| `champion-mastery-v4` by-puuid | **200 정상** |
-| `summoner-v1` by-puuid | 403 |
-| `league-v4` entries | 403 |
-| `match-v5` | 403 |
+| `account-v1` by-riot-id (asia) | **200** ✅ |
+| `league/v4/entries/by-puuid` (kr) | **200** ✅ ← 랭크 조회 |
+| `champion-mastery-v4` by-puuid | **200** ✅ |
+| `league/v4/entries/by-summoner` | 403 ❌ |
+| `summoner/v1` by-puuid | 403 ❌ |
+| `match-v5` | 403 ❌ |
 
-Riot 공식 이슈(developer-relations #677, #1090)에서도 동일 증상이 보고된다.
-"Dev API key returns 403 Forbidden on all endpoints" 라는 제목의 이슈가 열려 있고,
-해결책으로 **개발 키가 아니라 앱에 연결된 키**를 쓰라고 안내한다.
+**핵심은 "puuid 기반 엔드포인트"만 접근 가능하다**는 점이다.
+`encryptedSummonerId` 를 거치는 경로(`by-summoner`)는 403 이지만,
+puuid 를 직접 쓰는 경로(`by-puuid`)는 200 이다.
+
+그래서 **Summoner 단계를 아예 건너뛰고 2단계로 조회한다.**
 
 ```
-개발자 포털 → 프로필 → Apps → [내 앱] → API Keys 탭
+1. GET {accountBase}/riot/account/v1/accounts/by-riot-id/{gameName}/{tagLine}
+   → { puuid }
+2. GET {platformBase}/lol/league/v4/entries/by-puuid/{puuid}
+   → [{ queueType: "RANKED_SOLO_5x5", tier, rank, leaguePoints }, ...]
 ```
 
-**즉 랭크 자동 동기화를 쓰려면 아래 중 하나가 필요하다.**
+### ⚠️ 새 API 스키마: `division` 대신 `rank`
 
-1. **Personal Key 신청** (권장)
-   - 포털에서 "Register Project" → 앱 설명 작성
-   - **검증 절차 없이** 발급된다. Standard API(Summoner/League) 접근 가능.
-   - rate limit: 1초당 20 req, 2분당 100 req
-   - 단, "public consumption"(공개 서비스)에는 personal key 사용 불가 → 학교 내부용으로 운영
-2. **Production Key 신청**
-   - 동작하는 사이트 + `riot.txt` 도메인 검증 필요
-   - 리뷰는 주간 단위, 최대 3주
-   - 공개 서비스 운영 시 필수
+Riot 가 2025년경 랭크 응답 스키마를 바꿨다. 디비전 값이 필드명이 아닌 **값이 바뀐 것**이다.
+
+```jsonc
+// 구버전
+{ "tier": "PLATINUM", "division": "I", "leaguePoints": 65 }
+// 신버전 (실제 응답)
+{ "queueType":"RANKED_SOLO_5x5", "tier":"PLATINUM", "rank":"I", "leaguePoints":65,
+  "puuid":"...", "wins":..., "losses":..., "veteran":..., "inactive":... }
+```
+
+`division` 필드가 **아예 없다.** 코드가 `division`만 읽으면 디비전이 없는 것으로 오인해
+에러가 난다. `rank` 를 우선 읽고, 없으면 `division` 을 fallback 으로 쓴다.
+
+실측 확인:
+
+| Riot ID | 조회 결과 |
+|---|---|
+| `Chovy#KR1` | 플래티넘 1 65LP (rank="I") |
+| `Zeus#KR1` | 실버 3 24LP (rank="III") |
+| `Riot#KR1`, `Hide#KR1` | 랭크 없음 (빈 배열) |
+| `Faker#KR1` | Riot ID 없음 (404) |
+
+### ⚠️ 라우팅 규칙: Account-V1 과 플랫폼 API 는 호스트가 다르다
+
+Riot 는 두 가지 라우팅을 쓰는데, 헷갈리기 쉽다.
+
+| API 종류 | 라우팅 | KR용 호스트 |
+|---|---|---|
+| Account-V1 (puuid 조회) | **대륙**: AMERICAS / ASIA / EUROPE / SEA | `asia.api.riotgames.com` |
+| League-V4 (랭크 조회) | **플랫폼**: kr, na1, euw1 … | `kr.api.riotgames.com` |
+
+대륙 매핑: AMERICAS(NA,BR,LAN,LAS) ASIA(KR,JP) EUROPE(EUNE,EUW,ME1,TR,RU) SEA(OC,SG2,TW2,VN2)
+
+**`kr.api.riotgames.com` 으로 Account-V1 을 호출하면 403 이 돌아온다.**
+(공식 문서상 Account-V1 에는 `kr` 라우팅 값이 없다)
+
+그래서 환경변수를 두 개로 나눴다.
+
+| 변수 | 기본값 | 용도 |
+|---|---|---|
+| `RIOT_ACCOUNT_BASE` | `https://asia.api.riotgames.com` | Account-V1 (계정/PUUID 조회) |
+| `RIOT_PLATFORM_BASE` | `https://kr.api.riotgames.com` | League-V4 (랭크 조회) |
+
+### 키 종류별 차이
+
+| 종류 | 발급 | 랭크 조회 | 비고 |
+|---|---|---|---|
+| **Development key** | 포털 가입 시 자동 | **가능** (puuid 경로) | 24시간마다 만료 |
+| **Personal key** | Register Project | 가능 | 검증 절차 없음. 1초당 20req |
+| **Production key** | Register Project | 가능 | `riot.txt` 검증 필요, 최대 3주 |
+
+Personal/Production key 는 rate limit 이 훨씬 높고 24시간 만료가 없으므로,
+실서비스 운영 시에는 Personal key 를 신청하는 편이 현실적이다.
+(단, Riot 정책상 personal key 로 "public consumption"은 불가 → 학교 내부용 운영)
 
 ### 개발 키는 24시간마다 만료된다
 

@@ -15,6 +15,7 @@ import {
   computeScore,
   formatRank,
   isTier,
+  normalizeApiDivision,
   normalizeDivision,
   TIER_LABELS,
   type Tier,
@@ -428,9 +429,7 @@ app.post("/api/me/rank/sync", async (c) => {
     );
 
   const tier = rank.tier as Tier;
-  const division = normalizeDivision(tier, rank.division);
-  if (division === "invalid")
-    return c.json({ error: "Riot API에서 잘못된 디비전 값이 왔습니다." }, 502);
+  const division = normalizeApiDivision(tier, rank.division);
 
   const score = computeScore(tier, division, rank.lp);
   await db

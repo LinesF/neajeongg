@@ -76,6 +76,20 @@ export function normalizeDivision(
   return n;
 }
 
+/**
+ * Riot API 응답의 디비전 값을 정규화한다.
+ * API는 디비전을 주지 않을 수 있으므로(마스터 이상, 또는 새 스키마에서 누락)
+ * "invalid" 로 막지 않고 null(미상)로 취급한다.
+ */
+export function normalizeApiDivision(
+  tier: Tier,
+  division: number | null,
+): number | null {
+  if (!hasDivision(tier)) return null;
+  if (division === null) return null;
+  return Math.max(1, Math.min(division, 4));
+}
+
 export function formatRank(tier: Tier, division: number | null, lp: number): string {
   const label = TIER_LABELS[tier];
   if (!hasDivision(tier)) return `${label} ${lp}LP`;

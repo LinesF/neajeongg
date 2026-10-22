@@ -86,6 +86,40 @@ const accountMatch = url.pathname.match(
 		return;
 	}
 
+	if (/^\/lol\/league\/v4\/entries\/by-puuid\//.test(url.pathname)) {
+		const puuid = decodeURIComponent(url.pathname.split("/").pop() ?? "");
+		const riotId = [...PUUIDS].find(([, p]) => p === puuid)?.[0];
+		if (!riotId) {
+			send(res, 404, { status: { message: "Not found", status_code: 404 } });
+			return;
+		}
+		const rank = RANKS.get(riotId);
+		if (!rank) {
+			send(res, 200, []);
+			return;
+		}
+		send(res, 200, [
+			{
+				queueType: "RANKED_SOLO_5x5",
+				tier: rank.tier,
+				rank: rank.division,
+				leaguePoints: rank.leaguePoints,
+				wins: 100,
+				losses: 50,
+			},
+			{
+				queueType: "RANKED_FLEX_5x5",
+				tier: "PLATINUM",
+				division: "IV",
+				leaguePoints: 10,
+				wins: 10,
+				losses: 20,
+			},
+		]);
+		return;
+	}
+
+	// 구버전 경로(by-summoner)도 지원 — 실 API에서 403이므로 대체 경로로 쓰인다.
 	if (/^\/lol\/league\/v4\/entries\/by-summoner\//.test(url.pathname)) {
 		const summonerId = decodeURIComponent(url.pathname.split("/").pop() ?? "");
 		const puuid = summonerId.replace(/^sum-/, "");
@@ -103,7 +137,7 @@ const accountMatch = url.pathname.match(
 			{
 				queueType: "RANKED_SOLO_5x5",
 				tier: rank.tier,
-				division: rank.division,
+				rank: rank.division,
 				leaguePoints: rank.leaguePoints,
 				wins: 100,
 				losses: 50,
