@@ -25,6 +25,7 @@ const TIERS: { value: Tier; label: string }[] = [
 	{ value: "CHALLENGER", label: "챌린저" },
 ];
 
+/** 마스터 이상은 디비전 개념이 없다. */
 const DIVISION_TIERS: Tier[] = [
 	"IRON",
 	"BRONZE",
@@ -35,27 +36,28 @@ const DIVISION_TIERS: Tier[] = [
 	"DIAMOND",
 ];
 
+const SCHOOL_NAME = "김천고등학교";
+
 type LeaderboardEntry = {
 	rank: number;
 	userId: number;
 	nickname: string;
-	schoolId: number;
-	schoolName: string;
 	tier: Tier;
 	tierLabel: string;
 	division: number | null;
 	lp: number;
 	score: number;
+	source: string;
 	display: string;
 	updatedAt: string;
 };
 
-type SchoolSummary = {
+type SchoolInfo = {
 	id: number;
 	name: string;
 	memberCount: number;
-	rankedCount?: number;
-	bestScore?: number | null;
+	rankedCount: number;
+	bestScore: number | null;
 };
 
 type Me = {
@@ -93,24 +95,22 @@ export default function App() {
 	const [me, setMe] = useState<Me | null>(null);
 	const [myUser, setMyUser] = useState<MyUser | null>(null);
 	const [myUserId, setMyUserId] = useState<number | null>(null);
-	const [schools, setSchools] = useState<SchoolSummary[]>([]);
-	const [selectedSchool, setSelectedSchool] = useState<number | null>(null);
+	const [school, setSchool] = useState<SchoolInfo | null>(null);
 	const [entries, setEntries] = useState<LeaderboardEntry[]>([]);
 	const [loading, setLoading] = useState(true);
 	// 랭크 저장 등 데이터 변경 후 순위표를 강제로 다시 불러오기 위한 버전 값.
 	const [dataVersion, setDataVersion] = useState(0);
 
 	const loadSession = useCallback(async () => {
-		// 학교 목록은 로그인 여부와 무관하므로 항상 먼저 불러온다.
+		// 학교 정보는 로그인 여부와 무관하므로 항상 먼저 불러온다.
 		try {
-			const summary = await api<{ schools: SchoolSummary[]; me: Me | null }>(
+			const summary = await api<{ schools: SchoolInfo[]; me: Me | null }>(
 				"/api/summary",
 			);
-			setSchools(summary.schools);
+			setSchool(summary.schools[0] ?? null);
 			setMe(summary.me);
-			setSelectedSchool(summary.me?.schoolId ?? null);
 		} catch {
-			setSchools([]);
+			setSchool(null);
 		}
 
 		try {
@@ -126,9 +126,8 @@ export default function App() {
 	const loadLeaderboard = useCallback(async () => {
 		setLoading(true);
 		try {
-			const query = selectedSchool ? `?schoolId=${selectedSchool}` : "";
 			const data = await api<{ entries: LeaderboardEntry[] }>(
-				`/api/leaderboard${query}`,
+				"/api/leaderboard",
 			);
 			setEntries(data.entries);
 		} catch {
@@ -136,7 +135,7 @@ export default function App() {
 		} finally {
 			setLoading(false);
 		}
-	}, [selectedSchool]);
+	}, []);
 
 	useEffect(() => {
 		void loadSession();
@@ -151,155 +150,200 @@ export default function App() {
 		if (dataVersion > 0) void loadLeaderboard();
 	}, [dataVersion, loadLeaderboard]);
 
+	const onSaved = useCallback(async () => {
+		await loadSession();
+		setDataVersion((v) => v + 1);
+	}, [loadSession]);
+
 	return (
-		<div className="shell">
-			<header className="top">
-				<div className="brand">
-					<div className="logo">교</div>
-					<div>
-						<h1>교내 랭킹</h1>
-						<p>학교 단위 리그 오브 레전드 랭크 순위</p>
-					</div>
-				</div>
-				{me ? (
-					<div style={{ textAlign: "right" }}>
-						<div style={{ fontWeight: 700 }}>{me.nickname}</div>
-						<div className="muted">
-							{me.schoolName}
-							{me.schoolRank ? ` · ${me.schoolRank}위` : ""}
-						</div>
-					</div>
-				) : (
-					<button onClick={() => setTab("account")}>로그인 / 가입</button>
-				)}
-			</header>
-
-			<nav className="tabs">
-				<button
-					className={tab === "leaderboard" ? "active" : ""}
-					onClick={() => setTab("leaderboard")}
-				>
-					순위표
-				</button>
-				<button
-					className={tab === "rank" ? "active" : ""}
-					onClick={() => setTab("rank")}
-				>
-					내 랭크 등록
-				</button>
-				<button
-					className={tab === "account" ? "active" : ""}
-					onClick={() => setTab("account")}
-				>
-					{me ? "계정" : "로그인 / 가입"}
-				</button>
-			</nav>
-
-			{tab === "leaderboard" && (
-				<div className="grid two">
-					<div className="card">
-						<h2>학교 선택</h2>
-						<div className="school-list">
-							<button
-								className={`school-item ${selectedSchool === null ? "selected" : ""}`}
-								onClick={() => setSelectedSchool(null)}
-								style={{ width: "100%", textAlign: "left" }}
-							>
-								<span>전체 학교</span>
-								<span className="badge">전체</span>
-							</button>
-							{schools.length === 0 && (
-								<p className="muted">아직 등록된 학교가 없습니다.</p>
-							)}
-							{schools.map((s) => (
+		<>
+			<header className="gnb">
+				<div className="gnb-inner">
+					<a className="brand" href="/">
+						<span className="logo">김</span>
+						<span>{SCHOOL_NAME} 랭킹</span>
+						<span className="sub">LoL Solos</span>
+					</a>
+					<nav className="gnb-nav">
+						<button
+							className={tab === "leaderboard" ? "active" : ""}
+							onClick={() => setTab("leaderboard")}
+						>
+							순위표
+						</button>
+						<button
+							className={tab === "rank" ? "active" : ""}
+							onClick={() => setTab("rank")}
+						>
+							내 랭크
+						</button>
+						<button
+							className={tab === "account" ? "active" : ""}
+							onClick={() => setTab("account")}
+						>
+							계정
+						</button>
+					</nav>
+					<div className="gnb-user">
+						{me ? (
+							<>
+								<div className="who">
+									<strong>{me.nickname}</strong>
+									<span>
+										{me.ranked ? `${me.schoolRank}위` : "랭크 미등록"}
+									</span>
+								</div>
 								<button
-									key={s.id}
-									className={`school-item ${selectedSchool === s.id ? "selected" : ""}`}
-									onClick={() => setSelectedSchool(s.id)}
-									style={{ width: "100%", textAlign: "left" }}
+									className="ghost"
+									onClick={async () => {
+										await fetch("/api/auth/logout", { method: "POST" });
+										await loadSession();
+										setTab("account");
+									}}
 								>
-									<span>{s.name}</span>
-									<span className="badge">{s.memberCount}명</span>
+									로그아웃
 								</button>
-							))}
-						</div>
-					</div>
-
-					<div className="card">
-						<h2>
-							{selectedSchool === null
-								? "전체 순위"
-								: `${schools.find((s) => s.id === selectedSchool)?.name ?? ""} 순위`}
-						</h2>
-						{loading ? (
-							<p className="empty">불러오는 중…</p>
-						) : entries.length === 0 ? (
-							<p className="empty">
-								아직 랭크를 등록한 학생이 없습니다.
-								<br />
-								첫 순위를 등록해 보세요.
-							</p>
+							</>
 						) : (
-							<table>
-								<thead>
-									<tr>
-										<th>순위</th>
-										<th>닉네임</th>
-										<th>학교</th>
-										<th>랭크</th>
-									</tr>
-								</thead>
-								<tbody>
-									{entries.map((e) => (
-										<tr
-											key={e.userId}
-											className={e.userId === myUserId ? "me" : ""}
-										>
-											<td
-												className={`rank-num rank-${e.rank <= 3 ? e.rank : "n"}`}
-											>
-												{e.rank}
-											</td>
-											<td style={{ fontWeight: 600 }}>{e.nickname}</td>
-											<td className="muted">{e.schoolName}</td>
-											<td>
-												<span
-													className={`badge tier-${e.tier}`}
-													style={{ marginRight: "0.4rem" }}
-												>
-													{e.tierLabel}
-													</span>
-												<span className="muted">
-													{e.division ? `${e.division} ` : ""}
-													{e.lp}LP
-												</span>
-											</td>
-										</tr>
-									))}
-								</tbody>
-							</table>
+							<button onClick={() => setTab("account")}>로그인 / 가입</button>
 						)}
 					</div>
 				</div>
-			)}
+			</header>
 
-			{tab === "rank" && (
-				<RankForm
-					me={me}
-					user={myUser}
-					onSaved={async () => {
-						await loadSession();
-						setDataVersion((v) => v + 1);
-					}}
-				/>
-			)}
+			<main className="shell">
+				{tab === "leaderboard" && (
+					<>
+						<h1 className="page-title">교내 랭킹</h1>
+						<p className="page-sub">
+							{SCHOOL_NAME} 학생들의 리그 오브 레전드 솔로 랭크 순위
+						</p>
 
-			{tab === "account" &&
-				(me ? (
-					<AccountPanel me={me} onLogout={loadSession} />
-				) : (
-					<AuthPanel onDone={loadSession} />
-				))}
+						<div className="stat-row">
+							<div className="stat">
+								<span className="value">{school?.memberCount ?? 0}</span>
+								<span className="label">가입 학생</span>
+							</div>
+							<div className="stat">
+								<span className="value">{school?.rankedCount ?? 0}</span>
+								<span className="label">랭크 등록</span>
+							</div>
+							<div className="stat">
+								<span className="value">{entries.length}</span>
+								<span className="label">현재 순위표</span>
+							</div>
+							<div className="stat">
+								<span className="value">
+									{me?.schoolRank ? `${me.schoolRank}위` : "-"}
+								</span>
+								<span className="label">내 순위</span>
+							</div>
+						</div>
+
+						<div className="card">
+							<h2>전체 순위</h2>
+							{loading ? (
+								<p className="empty">불러오는 중…</p>
+							) : entries.length === 0 ? (
+								<p className="empty">
+									<strong>아직 랭크를 등록한 학생이 없습니다</strong>
+									첫 순위를 등록해 보세요.
+								</p>
+							) : (
+								<RankList
+									entries={entries}
+									myUserId={myUserId}
+									onOpenRank={() => setTab("rank")}
+								/>
+							)}
+						</div>
+					</>
+				)}
+
+				{tab === "rank" && (
+					<>
+						<h1 className="page-title">내 랭크</h1>
+						<p className="page-sub">
+							Riot API로 실제 랭크를 가져오거나 직접 입력할 수 있습니다.
+						</p>
+						<RankForm me={me} user={myUser} onSaved={onSaved} />
+					</>
+				)}
+
+				{tab === "account" &&
+					(me ? (
+						<>
+							<h1 className="page-title">계정</h1>
+							<p className="page-sub">{me.schoolName}</p>
+							<AccountPanel me={me} user={myUser} />
+						</>
+					) : (
+						<>
+							<h1 className="page-title">로그인 / 가입</h1>
+							<p className="page-sub">
+								{SCHOOL_NAME} 학생 계정을 만들거나 로그인하세요.
+							</p>
+							<AuthPanel onDone={loadSession} />
+						</>
+					))}
+			</main>
+		</>
+	);
+}
+
+function RankList({
+	entries,
+	myUserId,
+	onOpenRank,
+}: {
+	entries: LeaderboardEntry[];
+	myUserId: number | null;
+	onOpenRank: () => void;
+}) {
+	return (
+		<div className="rank-list">
+			<div className="rank-list__head">
+				<span style={{ textAlign: "center" }}>순위</span>
+				<span>닉네임</span>
+				<span>티어</span>
+				<span style={{ textAlign: "right" }}>LP</span>
+			</div>
+			{entries.map((e) => {
+				const isMe = e.userId === myUserId;
+				return (
+					<div
+						key={e.userId}
+						className={`rank-list__row${isMe ? " is-me" : ""}`}
+					>
+						<span
+							className={`rk${e.rank <= 3 ? ` rk-${e.rank}` : ""}`}
+						>
+							{e.rank}
+						</span>
+						<span className="nick">
+							{e.nickname}
+							{isMe && <span className="me-tag">ME</span>}
+						</span>
+						<span>
+							<span className={`tier tier-${e.tier}`}>
+								{e.tierLabel}
+								{e.division && <span className="div">{e.division}</span>}
+							</span>
+						</span>
+						<span className="lp">
+							{e.lp}
+							<span className="unit"> LP</span>
+						</span>
+					</div>
+				);
+			})}
+			{myUserId === null && (
+				<div style={{ marginTop: 16, textAlign: "center" }}>
+					<button className="primary" onClick={onOpenRank}>
+						내 랭크 등록하러 가기
+					</button>
+				</div>
+			)}
 		</div>
 	);
 }
@@ -318,7 +362,7 @@ function RankForm({
 	const [lp, setLp] = useState(50);
 	const [riotId, setRiotId] = useState(user?.riotId ?? "");
 	const [error, setError] = useState<string | null>(null);
-	const [saved, setSaved] = useState(false);
+	const [saved, setSaved] = useState<string | null>(null);
 	const [busy, setBusy] = useState(false);
 	const [syncing, setSyncing] = useState(false);
 
@@ -332,7 +376,10 @@ function RankForm({
 	if (!me) {
 		return (
 			<div className="card">
-				<p className="empty">로그인 후 랭크를 등록할 수 있습니다.</p>
+				<p className="empty">
+					<strong>로그인이 필요합니다</strong>
+					계정 탭에서 로그인한 뒤 랭크를 등록하세요.
+				</p>
 			</div>
 		);
 	}
@@ -357,6 +404,7 @@ function RankForm({
 		e.preventDefault();
 		setBusy(true);
 		setError(null);
+		setSaved(null);
 		try {
 			await api("/api/me/rank", {
 				method: "PUT",
@@ -366,7 +414,7 @@ function RankForm({
 					lp,
 				}),
 			});
-			setSaved(true);
+			setSaved("랭크가 저장되었습니다.");
 			await onSaved();
 		} catch (err) {
 			setError((err as Error).message);
@@ -379,16 +427,15 @@ function RankForm({
 	async function syncFromRiot() {
 		setSyncing(true);
 		setError(null);
-		setSaved(false);
+		setSaved(null);
 		try {
 			if (!(await saveRiotId())) return;
 			const res = await api<{ rank: { display: string } }>(
 				"/api/me/rank/sync",
 				{ method: "POST" },
 			);
-			setSaved(true);
+			setSaved(`Riot API에서 랭크를 가져왔습니다: ${res.rank.display}`);
 			await onSaved();
-			alert(`Riot API에서 랭크를 가져왔습니다: ${res.rank.display}`);
 		} catch (err) {
 			setError((err as Error).message);
 		} finally {
@@ -397,82 +444,80 @@ function RankForm({
 	}
 
 	return (
-		<div className="card" style={{ maxWidth: 520 }}>
-			<h2>내 랭크 등록</h2>
-			<p className="muted" style={{ marginTop: 0 }}>
-				{me.schoolName} · 현재 {me.ranked ? `${me.schoolRank}위` : "랭크 미등록"}
-			</p>
-			{saved && (
-				<div className="notice">랭크가 저장되었습니다. 순위표를 확인하세요.</div>
-			)}
-			{error && <div className="error">{error}</div>}
-
+		<div className="card" style={{ maxWidth: 560 }}>
+			<h2>Riot API로 랭크 가져오기</h2>
 			<div className="field">
-				<label htmlFor="riot">Riot ID (게임이름#태그)</label>
+				<label htmlFor="riot">Riot ID</label>
 				<input
 					id="riot"
 					value={riotId}
 					onChange={(e) => setRiotId(e.target.value)}
-					placeholder="예: Hide#KR1"
+					placeholder="게임이름#태그"
 				/>
-				<p className="muted" style={{ margin: "0.35rem 0 0" }}>
-					Riot API로 실제 랭크를 자동으로 가져옵니다.
+				<p className="hint">
+					리그 오브 레전드 닉네임#태그를 입력하면 실제 랭크를 자동으로
+					조회합니다.
 				</p>
 			</div>
 			<button
 				type="button"
+				className="primary"
 				onClick={syncFromRiot}
 				disabled={syncing || !riotId.trim()}
-				style={{ width: "100%", marginBottom: "1.5rem" }}
+				style={{ width: "100%", marginBottom: 24 }}
 			>
-				{syncing ? "Riot API 조회 중…" : "Riot API로 랭크 가져오기"}
+				{syncing ? "조회 중…" : "랭크 가져오기"}
 			</button>
 
-			<h3>또는 직접 입력</h3>
+			<h3>직접 입력</h3>
+			{saved && <div className="notice">{saved}</div>}
+			{error && <div className="error">{error}</div>}
 			<form onSubmit={submit}>
-				<div className="field">
-					<label htmlFor="tier">티어</label>
-					<select
-						id="tier"
-						value={tier}
-						onChange={(e) => setTier(e.target.value as Tier)}
-					>
-						{TIERS.map((t) => (
-							<option key={t.value} value={t.value}>
-								{t.label}
-							</option>
-						))}
-					</select>
-				</div>
-				{needsDivision && (
+				<div className="row">
 					<div className="field">
-						<label htmlFor="div">디비전</label>
+						<label htmlFor="tier">티어</label>
 						<select
-							id="div"
-							value={division}
-							onChange={(e) => setDivision(Number(e.target.value))}
+							id="tier"
+							value={tier}
+							onChange={(e) => setTier(e.target.value as Tier)}
 						>
-							{[1, 2, 3, 4].map((d) => (
-								<option key={d} value={d}>
-									{d}디비전
+							{TIERS.map((t) => (
+								<option key={t.value} value={t.value}>
+									{t.label}
 								</option>
 							))}
 						</select>
 					</div>
-				)}
-				<div className="field">
-					<label htmlFor="lp">LP (리그 포인트)</label>
-					<input
-						id="lp"
-						type="number"
-						min={0}
-						max={9999}
-						value={lp}
-						onChange={(e) => setLp(Number(e.target.value))}
-					/>
+					{needsDivision && (
+						<div className="field">
+							<label htmlFor="div">디비전</label>
+							<select
+								id="div"
+								value={division}
+								onChange={(e) => setDivision(Number(e.target.value))}
+							>
+								{[1, 2, 3, 4].map((d) => (
+									<option key={d} value={d}>
+										{d}디비전
+									</option>
+								))}
+							</select>
+						</div>
+					)}
+					<div className="field">
+						<label htmlFor="lp">LP</label>
+						<input
+							id="lp"
+							type="number"
+							min={0}
+							max={9999}
+							value={lp}
+							onChange={(e) => setLp(Number(e.target.value))}
+						/>
+					</div>
 				</div>
 				<button className="primary" type="submit" disabled={busy}>
-					{busy ? "저장 중…" : "직접 입력 저장"}
+					{busy ? "저장 중…" : "랭크 저장"}
 				</button>
 			</form>
 		</div>
@@ -483,38 +528,24 @@ function AuthPanel({ onDone }: { onDone: () => Promise<void> }) {
 	const [mode, setMode] = useState<"login" | "register">("register");
 	const [nickname, setNickname] = useState("");
 	const [password, setPassword] = useState("");
-	const [schoolName, setSchoolName] = useState("");
-	const [joinCode, setJoinCode] = useState("");
 	const [riotId, setRiotId] = useState("");
 	const [error, setError] = useState<string | null>(null);
-	const [issuedCode, setIssuedCode] = useState<string | null>(null);
 	const [busy, setBusy] = useState(false);
 
 	async function submit(e: React.FormEvent) {
 		e.preventDefault();
 		setBusy(true);
 		setError(null);
-		setIssuedCode(null);
 		try {
 			if (mode === "register") {
-				const res = await api<{ joinCode: string | null }>("/api/auth/register", {
+				await api("/api/auth/register", {
 					method: "POST",
 					body: JSON.stringify({
 						nickname,
 						password,
-						schoolName,
-						joinCode: joinCode || undefined,
 						riotId: riotId || undefined,
 					}),
 				});
-				if (res.joinCode) {
-					setIssuedCode(res.joinCode);
-					setJoinCode(res.joinCode);
-					setSchoolName("");
-					setNickname("");
-					setPassword("");
-					setRiotId("");
-				}
 			} else {
 				await api("/api/auth/login", {
 					method: "POST",
@@ -546,13 +577,6 @@ function AuthPanel({ onDone }: { onDone: () => Promise<void> }) {
 				</button>
 			</div>
 
-			{issuedCode && (
-				<div className="notice">
-					학교가 만들어졌습니다. 아래 참가 코드를 학생들에게 공유하세요.
-					<br />
-					<code>{issuedCode}</code>
-				</div>
-			)}
 			{error && <div className="error">{error}</div>}
 
 			<form onSubmit={submit}>
@@ -562,7 +586,7 @@ function AuthPanel({ onDone }: { onDone: () => Promise<void> }) {
 						id="nick"
 						value={nickname}
 						onChange={(e) => setNickname(e.target.value)}
-						placeholder="예: 하늘왕"
+						placeholder="닉네임"
 						autoComplete="username"
 					/>
 				</div>
@@ -580,38 +604,18 @@ function AuthPanel({ onDone }: { onDone: () => Promise<void> }) {
 					/>
 				</div>
 				{mode === "register" && (
-					<>
-						<div className="field">
-							<label htmlFor="school">학교명</label>
-							<input
-								id="school"
-								value={schoolName}
-								onChange={(e) => setSchoolName(e.target.value)}
-								placeholder="예: OO고등학교"
-							/>
-						</div>
-						<div className="field">
-							<label htmlFor="code">학교 참가 코드 (기존 학교일 때)</label>
-							<input
-								id="code"
-								value={joinCode}
-								onChange={(e) => setJoinCode(e.target.value.toUpperCase())}
-								placeholder="ABCD-1234"
-							/>
-						</div>
-						<div className="field">
-							<label htmlFor="regriot">Riot ID (선택, 게임이름#태그)</label>
-							<input
-								id="regriot"
-								value={riotId}
-								onChange={(e) => setRiotId(e.target.value)}
-								placeholder="예: Hide#KR1"
-							/>
-							<p className="muted" style={{ margin: "0.35rem 0 0" }}>
-								입력하면 실제 랭크를 자동으로 조회할 수 있습니다.
-							</p>
-						</div>
-					</>
+					<div className="field">
+						<label htmlFor="regriot">Riot ID (선택)</label>
+						<input
+							id="regriot"
+							value={riotId}
+							onChange={(e) => setRiotId(e.target.value)}
+							placeholder="게임이름#태그"
+						/>
+						<p className="hint">
+							입력하면 실제 랭크를 자동으로 조회할 수 있습니다.
+						</p>
+					</div>
 				)}
 				<button className="primary" type="submit" disabled={busy}>
 					{busy ? "처리 중…" : mode === "register" ? "가입하기" : "로그인"}
@@ -621,42 +625,29 @@ function AuthPanel({ onDone }: { onDone: () => Promise<void> }) {
 	);
 }
 
-function AccountPanel({
-	me,
-	onLogout,
-}: {
-	me: Me;
-	onLogout: () => Promise<void>;
-}) {
-	const [busy, setBusy] = useState(false);
-
-	async function logout() {
-		setBusy(true);
-		await fetch("/api/auth/logout", { method: "POST" });
-		await onLogout();
-		setBusy(false);
-	}
-
+function AccountPanel({ me, user }: { me: Me; user: MyUser | null }) {
 	return (
 		<div className="card" style={{ maxWidth: 460 }}>
-			<h2>내 계정</h2>
-			<div className="stat">
-				<span className="value">{me.nickname}</span>
-				<span className="label">닉네임</span>
+			<div className="stat-row">
+				<div className="stat">
+					<span className="value">{me.nickname}</span>
+					<span className="label">닉네임</span>
+				</div>
+				<div className="stat">
+					<span className="value">
+						{me.ranked ? `${me.schoolRank}위` : "-"}
+					</span>
+					<span className="label">학교 내 순위</span>
+				</div>
 			</div>
-			<div className="stat">
-				<span className="value">{me.schoolName}</span>
-				<span className="label">소속 학교</span>
+			<div className="field">
+				<label>소속 학교</label>
+				<p style={{ margin: 0 }}>{me.schoolName}</p>
 			</div>
-			<div className="stat">
-				<span className="value">
-					{me.ranked ? `${me.schoolRank}위` : "-"}
-				</span>
-				<span className="label">학교 내 순위</span>
+			<div className="field">
+				<label>Riot ID</label>
+				<p style={{ margin: 0 }}>{user?.riotId ?? "등록되지 않음"}</p>
 			</div>
-			<button onClick={logout} disabled={busy}>
-				로그아웃
-			</button>
 		</div>
 	);
 }

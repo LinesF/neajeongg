@@ -106,10 +106,25 @@ npx wrangler secret put RIOT_API_KEY
 
 6. 커스텀 도메인은 Cloudflare 네임서버를 쓰는 존에 붙일 수 있다.
 
+## 학교: 김천고등학교 단일 운영
+
+현재 **김천고등학교 한 곳만** 운영하는 구조다. 학교 선택 UI와 참가 코드는 제거했다.
+
+- 기준 학교: `schools` 테이블의 `id = 1`, 이름 `김천고등학교`
+- 설정은 `src/worker/config.ts` 한 곳에 모아뒀다 (`SCHOOL_ID`, `SCHOOL_NAME`)
+
+학교를 나중에 추가하려면:
+
+1. `schools` 테이블에 행 추가 (id, name, created_at)
+2. `src/worker/config.ts` 의 `SCHOOL_ID` 를 새 학교 id로 변경
+
+`schools` 테이블은 그대로 유지하므로 마이그레이션은 필요 없다.
+(단일 학교 → 다중 학교로 바꿀 때 사용자 UI의 학교 선택기를 되살리면 된다)
+
 ## 데이터 모델
 
 ```
-schools       (id, name, join_code, created_at)
+schools       (id, name, created_at)
 users         (id, nickname, riot_id, password_hash, password_salt, school_id, created_at)
 sessions      (id=sha256(token), user_id, expires_at, created_at)
 rank_entries  (id, user_id, season, tier, division, lp, score, source, updated_at)
@@ -125,38 +140,91 @@ rank_entries  (id, user_id, season, tier, division, lp, score, source, updated_a
 `rank_entries.source`는 `manual`(직접 입력) 또는 `riot`(API 조회)이다.
 시즌 전환은 `rank_entries.season` 컬럼만 늘리면 된다.
 
-### 학교 참가 코드
-
-학교를 처음 만든 사용자에게 `XXXX-XXXX` 형식의 코드가 발급된다.
-같은 학교에 가입할 때 이 코드를 입력해야 하므로, 다른 학교 학생이 임의로 끼어드는 것을 막는다.
-
 ## API
 
 | 메서드 | 경로 | 설명 |
 |---|---|---|
-| GET | `/api/schools` | 학교 목록 + 멤버 수 |
-| POST | `/api/auth/register` | 가입 (학교 최초 생성 시 참가 코드 발급) |
+| GET | `/api/schools` | 학교 정보 + 멤버 수 |
+| POST | `/api/auth/register` | 가입 (학교는 김천고등학교 고정) |
 | POST | `/api/auth/login` | 로그인 |
 | POST | `/api/auth/logout` | 로그아웃 (세션 삭제) |
 | GET | `/api/me` | 내 정보 + 등록된 랭크 |
 | PUT | `/api/me/riot-id` | Riot ID 등록/변경 |
 | PUT | `/api/me/rank` | 랭크 직접 입력/갱신 |
 | POST | `/api/me/rank/sync` | Riot API로 실제 랭크 조회 후 갱신 |
-| GET | `/api/leaderboard` | 순위표 (`?schoolId=` 필터, `?limit=`) |
-| GET | `/api/summary` | 학교별 요약 + 내 학교 내 순위 |
+| GET | `/api/leaderboard` | 순위표 (`?limit=`) |
+| GET | `/api/summary` | 학교 요약 + 내 순위 |
 
 ## Riot API 참고
 
 - 조회 큐는 랭킹 게임(5인) `RANKED_SOLO_5x5` 기준
 - Riot ID 형식: `게임이름#태그` (태그는 한글/영문/숫자, 5자 이하)
 - KR은 region이 `kr`, platform이 `KR`
-- 새 개발 키는 발급 후 몇 시간간 `Unknown apikey`를 반환하는 알려진 이슈가 있다
 - rate limit이 있으므로 주기적 전체 동기화보다 사용자가 누르는 방식이 안전하다
+
+### 개발 키는 24시간마다 만료된다
+
+Riot 공식 문서 기준, 개발자 포털에서 받는 **development API key는 24시간마다 비활성화**된다.
+매일 포털에서 키를 새로 발급받아 `RIOT_API_KEY`를 갱신해야 한다.
+실서비스를 공개하려면 production key를 신청해야 하며, 아래는 신청 요건이다.
+
+- **Personal key**: 개인 프로젝트/프로토타입용. 비교적 간단히 발급된다.
+- **Production key**: 실제 서비스 공개용. **동작하는 웹사이트가 있어야** 승인된다.
+  - 사이트 도메인 소유권 증명을 위한 `riot.txt` 업로드가 필요하다.
+  - 리뷰는 주간 단위로 진행되며, 최대 3주가 걸릴 수 있다.
+  - rate limit이 personal key보다 훨씬 높다 (10초당 500 req).
+
+### 학교 와이파이에서 Riot API가 막히는 경우
+
+`kr.api.riotgames.com` 접속이 TLS 단계에서 끊기면(`SSL routines:: unexpected eof`,
+curl exit 35) 키 문제가 아니라 **네트워크 차단**이다. 확인할 방법:
+
+```bash
+curl -s -w "HTTP=%{http_code}\n" -H "X-Riot-Token: $RIOT_API_KEY" \
+  "https://kr.api.riotgames.com/riot/account/v1/accounts/by-riot-id/hide/onbush"
+```
+
+- `HTTP=401 Unknown apikey` → 키가 만료되었거나 아직 인식되지 않음. 포털에서 재발급.
+- `HTTP=403 Forbidden` → 키는 인식되지만 아직 승인/활성화 대기 중.
+- `curl exit 35` / `HTTP=000` → **네트워크 차단**. 학교 와이파이가 riotgames.com을 막은 경우.
+
+이 경우 세 가지 대안이 있다.
+
+1. **개인(핸드폰) 테더링** 등 Riot API를 통과하는 네트워크에서 테스트.
+2. **목 서버로 개발**: `npm run dev:mock` — 실 API와 동일한 응답 형식을 재현한다.
+3. **Cloudflare Workers 배포 후 확인**: Workers의 아웃바운드는 학교 와이파이를 거치지 않으므로,
+   배포된 환경에서는 정상 동작한다. (로컬만 막히는 경우)
+
+## 디자인
+
+op.gg(https://op.gg) 레퍼런스 기반. 색상 토큰은 Wayback Machine 스냅샷
+(2025-01-13, `s-lol-web.op.gg/_next/static/css/`)에서 실제 값을 추출했다.
+
+| 역할 | 값 |
+|---|---|
+| GNB 배경 | `#1c1c1f` |
+| 표면 (카드) | `#202d37` |
+| 보조 표면 | `#263340` / `#2d3b49` |
+| 액센트 블루 | `#5383e8` |
+| 골드 액센트 | `#ffb900` / `#eb9c00` |
+| 본문 텍스트 | `#ebeef1` |
+| 보조 텍스트 | `#9aa4af` / `#6d7a86` |
+| 폰트 | Roboto + Pretendard |
+
+티어 색상은 LoL 공식 팔레트를 따른다 (아이언 `#7d8791` … 챌린저 `#f7e58c`).
+
+주요 요소:
+- 상단 48px GNB (op.gg DesktopGNB 규격) — 로고/내비/사용자 정보
+- 통계 카드 4개 (가입 학생 / 랭크 등록 / 순위표 / 내 순위)
+- 순위 리스트: `순위 | 닉네임 | 티어 | LP` 4열, 1~3위 금/은/동
+- 티어 뱃지는 어두운 배경 + 색상 왼쪽 바 + 티어색 텍스트
+- 내 행은 파란 왼쪽 바 + `ME` 태그
 
 ## 다음 단계 아이디어
 
-- **티어 이미지/뱃지**
-- **전체 학교 순위**: 학교별 최고 점수를 집계한 학교 순위표
-- **학교 관리자**: 학교 대표가 참가 코드를 재발급하거나 멤버를 관리
+- **티어 이미지/에블럼**: op.gg는 티어 이미지를 SVG로 제공하는데, 현재는 색상 뱃지로 대체했다
+- **여러 학교 지원**: 학교 선택 UI를 되살리고 학교별 순위표 추가
 - **시즌 관리 UI**
 - **Cron으로 주기적 랭크 갱신** (rate limit 고려 필요)
+- **전체 학교 순위**: 학교별 최고 점수를 집계한 순위표
+- **학교 관리자**: 학교 대표가 멤버를 관리하는 기능

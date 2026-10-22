@@ -98,12 +98,3 @@ export async function hashSessionToken(token: string): Promise<string> {
   );
   return toBase64(new Uint8Array(digest));
 }
-
-/** 학교 참가 코드: 사람이 읽고 타이핑하기 쉬운 문자열 (O/0, I/1 제외). */
-export function generateJoinCode(): string {
-  const alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
-  const bytes = crypto.getRandomValues(new Uint8Array(8));
-  let code = "";
-  for (const b of bytes) code += alphabet[b % alphabet.length];
-  return `${code.slice(0, 4)}-${code.slice(4)}`;
-}

@@ -2,8 +2,8 @@ import { Hono } from "hono";
 import { and, desc, eq, sql } from "drizzle-orm";
 import { createDb } from "./db";
 import { rankEntries, schools, sessions, users } from "./db/schema";
+import { SCHOOL_ID, SCHOOL_NAME } from "./config";
 import {
-  generateJoinCode,
   generateSessionToken,
   hashPassword,
   hashSessionToken,
@@ -116,7 +116,7 @@ app.get("/api/schools", async (c) => {
       memberCount: sql<number>`(select count(*) from users u where u.school_id = schools.id)`,
     })
     .from(schools)
-    .orderBy(desc(schools.createdAt));
+    .where(eq(schools.id, SCHOOL_ID));
 
   return c.json({ schools: rows });
 });
@@ -127,15 +127,11 @@ app.post("/api/auth/register", async (c) => {
   const body = await c.req.json<{
     nickname?: string;
     password?: string;
-    schoolName?: string;
-    joinCode?: string;
     riotId?: string;
   }>();
 
   const nickname = (body.nickname ?? "").trim();
   const password = body.password ?? "";
-  const schoolName = (body.schoolName ?? "").trim();
-  const joinCode = (body.joinCode ?? "").trim().toUpperCase();
   const riotIdInput = (body.riotId ?? "").trim();
 
   let riotId: string | null = null;
@@ -153,40 +149,21 @@ app.post("/api/auth/register", async (c) => {
   if (nickErr) return c.json({ error: nickErr }, 400);
   if (password.length < 6)
     return c.json({ error: "비밀번호는 6자 이상이어야 합니다." }, 400);
-  if (!schoolName) return c.json({ error: "학교명을 입력해 주세요." }, 400);
-  if (schoolName.length > 60)
-    return c.json({ error: "학교명이 너무 깁니다." }, 400);
 
   const db = createDb(c.env);
-  const existingSchool = await db
-    .select()
+
+  // 학교는 김천고등학교 한 곳뿐이다. 학교가 아직 없으면 자동 생성한다.
+  const schoolRows = await db
+    .select({ id: schools.id })
     .from(schools)
-    .where(eq(schools.name, schoolName))
+    .where(eq(schools.id, SCHOOL_ID))
     .limit(1);
 
-  let schoolId: number;
-  let issuedJoinCode: string | null = null;
-
-  if (existingSchool[0]) {
-    if (existingSchool[0].joinCode !== joinCode) {
-      return c.json({ error: "학교 참가 코드가 올바르지 않습니다." }, 403);
-    }
-    schoolId = existingSchool[0].id;
-  } else {
-    if (joinCode) {
-      return c.json(
-        { error: "존재하지 않는 학교입니다. 참가 코드를 비워 주세요." },
-        400,
-      );
-    }
-    issuedJoinCode = generateJoinCode();
+  let schoolId = SCHOOL_ID;
+  if (!schoolRows[0]) {
     const inserted = await db
       .insert(schools)
-      .values({
-        name: schoolName,
-        joinCode: issuedJoinCode,
-        createdAt: new Date(),
-      })
+      .values({ id: SCHOOL_ID, name: SCHOOL_NAME, createdAt: new Date() })
       .returning({ id: schools.id });
     schoolId = inserted[0].id;
   }
@@ -229,9 +206,7 @@ app.post("/api/auth/register", async (c) => {
   return c.json(
     {
       user: { id: userId, nickname },
-      school: { name: schoolName },
-      // 학교를 처음 만든 경우에만 참가 코드를 돌려준다.
-      joinCode: issuedJoinCode,
+      school: { id: schoolId, name: SCHOOL_NAME },
     },
     201,
   );
@@ -507,11 +482,7 @@ app.put("/api/me/riot-id", async (c) => {
 
 app.get("/api/leaderboard", async (c) => {
   const db = createDb(c.env);
-  const schoolIdParam = c.req.query("schoolId");
   const limit = Math.min(Number(c.req.query("limit") ?? 50) || 50, 200);
-
-  const conditions = [eq(rankEntries.season, CURRENT_SEASON)];
-  if (schoolIdParam) conditions.push(eq(users.schoolId, Number(schoolIdParam)));
 
   const rows = await db
     .select({
@@ -523,12 +494,18 @@ app.get("/api/leaderboard", async (c) => {
       division: rankEntries.division,
       lp: rankEntries.lp,
       score: rankEntries.score,
+      source: rankEntries.source,
       updatedAt: rankEntries.updatedAt,
     })
     .from(rankEntries)
     .innerJoin(users, eq(rankEntries.userId, users.id))
     .innerJoin(schools, eq(users.schoolId, schools.id))
-    .where(and(...conditions))
+    .where(
+      and(
+        eq(rankEntries.season, CURRENT_SEASON),
+        eq(users.schoolId, SCHOOL_ID),
+      ),
+    )
     .orderBy(desc(rankEntries.score))
     .limit(limit);
 
@@ -543,6 +520,7 @@ app.get("/api/leaderboard", async (c) => {
     division: r.division,
     lp: r.lp,
     score: r.score,
+    source: r.source,
     display: formatRank(r.tier as Tier, r.division, r.lp),
     updatedAt: r.updatedAt,
   }));
@@ -550,7 +528,7 @@ app.get("/api/leaderboard", async (c) => {
   return c.json({ entries });
 });
 
-/** 학교별 요약 + 내 학교 내 순위 */
+/** 서비스 요약: 학교 정보 + 내 순위 */
 app.get("/api/summary", async (c) => {
   const userId = await currentUserId(c);
   const db = createDb(c.env);
@@ -564,7 +542,7 @@ app.get("/api/summary", async (c) => {
       bestScore: sql<number | null>`(select max(r.score) from rank_entries r join users u on u.id = r.user_id where u.school_id = schools.id and r.season = ${CURRENT_SEASON})`,
     })
     .from(schools)
-    .orderBy(desc(schools.createdAt));
+    .where(eq(schools.id, SCHOOL_ID));
 
   let me = null;
   if (userId) {

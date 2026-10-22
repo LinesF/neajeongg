@@ -6,13 +6,18 @@ import {
   uniqueIndex,
 } from "drizzle-orm/sqlite-core";
 
+/**
+ * 학교 테이블.
+ *
+ * 현재는 김천고등학교 한 곳만 운영하지만, 나중에 학교를 추가할 수 있도록
+ * 테이블은 그대로 유지한다. 학교를 추가하려면 이 테이블에 행을 넣고
+ * src/worker/config.ts 의 SCHOOL_ID 를 갱신하면 된다.
+ */
 export const schools = sqliteTable(
   "schools",
   {
     id: integer("id").primaryKey({ autoIncrement: true }),
     name: text("name").notNull(),
-    // 공유 참가 코드: 다른 학교 학생이 임의로 합류하지 못하게 막는다.
-    joinCode: text("join_code").notNull(),
     createdAt: integer("created_at", { mode: "timestamp" }).notNull(),
   },
   (t) => [uniqueIndex("schools_name_idx").on(t.name)],

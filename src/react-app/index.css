@@ -1,20 +1,42 @@
+/*
+ * op.gg 레퍼런스 스타일 (Wayback 스냅샷 2025-01-13에서 추출한 실제 토큰)
+ *   배경 #1c1c1f (GNB) / 표면 #202d37 / 액센트 블루 #5383e8
+ *   골드 액센트 #ffb900 / 본문 #ebeef1 / 보조 #9aa4af
+ *   폰트 Roboto + Pretendard
+ */
+
 :root {
-	--bg: #0a0e1a;
-	--panel: #141a2a;
-	--panel-2: #1b2236;
-	--border: #263049;
-	--text: #e8ecf6;
-	--muted: #8b96b3;
-	--accent: #4f8cff;
-	--accent-soft: rgba(79, 140, 255, 0.14);
-	--gold: #f0b429;
-	--silver: #c9d1e0;
-	--bronze: #c98b5e;
-	--danger: #ff6b6b;
-	--ok: #38d39f;
+	--bg: #12141a;
+	--bg-gnb: #1c1c1f;
+	--surface: #202d37;
+	--surface-2: #263340;
+	--surface-3: #2d3b49;
+	--border: #313c48;
+	--border-strong: #3d4a58;
+
+	--text: #ebeef1;
+	--text-muted: #9aa4af;
+	--text-dim: #6d7a86;
+
+	--accent: #5383e8;
+	--accent-hover: #6b95f0;
+	--gold: #ffb900;
+	--gold-deep: #eb9c00;
+	--teal: #00bba3;
+
+	--tier-iron: #7d8791;
+	--tier-bronze: #a2653b;
+	--tier-silver: #8d96a3;
+	--tier-gold: #c8aa6e;
+	--tier-platinum: #1fc7b4;
+	--tier-emerald: #26a65b;
+	--tier-diamond: #5294e2;
+	--tier-master: #c44cff;
+	--tier-grandmaster: #e84057;
+	--tier-challenger: #f7e58c;
 
 	color-scheme: dark;
-	font-family: "Pretendard", -apple-system, BlinkMacSystemFont, "Segoe UI",
+	font-family: Roboto, Pretendard, -apple-system, BlinkMacSystemFont, "Segoe UI",
 		"Apple SD Gothic Neo", "Malgun Gothic", system-ui, sans-serif;
 	font-synthesis: none;
 	text-rendering: optimizeLegibility;
@@ -31,6 +53,8 @@ body {
 	color: var(--text);
 	min-width: 320px;
 	min-height: 100vh;
+	font-size: 14px;
+	line-height: 1.5;
 }
 
 h1,
@@ -47,24 +71,24 @@ a {
 
 button {
 	font-family: inherit;
-	font-size: 0.95rem;
-	font-weight: 600;
-	border-radius: 10px;
+	font-size: 14px;
+	font-weight: 500;
+	border-radius: 4px;
 	border: 1px solid var(--border);
-	padding: 0.65rem 1.1rem;
-	background: var(--panel-2);
+	padding: 9px 16px;
+	background: var(--surface-2);
 	color: var(--text);
 	cursor: pointer;
-	transition: border-color 0.15s, background 0.15s, opacity 0.15s;
+	transition: background 0.15s, border-color 0.15s, opacity 0.15s;
 }
 
 button:hover:not(:disabled) {
-	border-color: var(--accent);
-	background: var(--accent-soft);
+	border-color: var(--border-strong);
+	background: var(--surface-3);
 }
 
 button:disabled {
-	opacity: 0.55;
+	opacity: 0.5;
 	cursor: not-allowed;
 }
 
@@ -72,21 +96,34 @@ button.primary {
 	background: var(--accent);
 	border-color: var(--accent);
 	color: #fff;
+	font-weight: 700;
 }
 
 button.primary:hover:not(:disabled) {
-	background: #3f7af0;
+	background: var(--accent-hover);
+	border-color: var(--accent-hover);
+}
+
+button.ghost {
+	background: transparent;
+	border-color: transparent;
+	color: var(--text-muted);
+}
+
+button.ghost:hover:not(:disabled) {
+	color: var(--text);
+	background: var(--surface-2);
 }
 
 input,
 select {
 	font-family: inherit;
-	font-size: 0.95rem;
+	font-size: 14px;
 	width: 100%;
-	padding: 0.65rem 0.8rem;
-	border-radius: 10px;
+	padding: 9px 12px;
+	border-radius: 4px;
 	border: 1px solid var(--border);
-	background: #0f1422;
+	background: #171a21;
 	color: var(--text);
 }
 
@@ -96,292 +133,463 @@ select:focus {
 	border-color: var(--accent);
 }
 
+input::placeholder {
+	color: var(--text-dim);
+}
+
 label {
 	display: block;
-	font-size: 0.82rem;
-	color: var(--muted);
-	margin-bottom: 0.35rem;
+	font-size: 12px;
+	font-weight: 700;
+	color: var(--text-muted);
+	margin-bottom: 6px;
+	letter-spacing: 0.02em;
 }
 
 .field {
-	margin-bottom: 0.9rem;
+	margin-bottom: 16px;
 }
 
-.error {
-	background: rgba(255, 107, 107, 0.12);
-	border: 1px solid rgba(255, 107, 107, 0.4);
-	color: #ffb3b3;
-	padding: 0.7rem 0.9rem;
-	border-radius: 10px;
-	font-size: 0.9rem;
-	margin-bottom: 1rem;
+/* ---------------------------------------------------- GNB (상단 내비게이션) */
+
+.gnb {
+	position: sticky;
+	top: 0;
+	z-index: 20;
+	background: var(--bg-gnb);
+	border-bottom: 1px solid var(--border);
 }
 
-.notice {
-	background: rgba(56, 211, 159, 0.12);
-	border: 1px solid rgba(56, 211, 159, 0.4);
-	color: #9ff0d0;
-	padding: 0.8rem 0.9rem;
-	border-radius: 10px;
-	font-size: 0.9rem;
-	margin-bottom: 1rem;
-}
-
-.notice code {
-	font-size: 1.05rem;
-	font-weight: 700;
-	letter-spacing: 0.08em;
-	color: #fff;
-}
-
-.shell {
-	max-width: 1100px;
+.gnb-inner {
+	max-width: 1180px;
 	margin: 0 auto;
-	padding: 1.5rem 1rem 4rem;
-}
-
-header.top {
+	height: 48px;
+	padding: 0 16px;
 	display: flex;
 	align-items: center;
 	justify-content: space-between;
-	gap: 1rem;
-	flex-wrap: wrap;
-	padding: 0.75rem 0 1.5rem;
-	border-bottom: 1px solid var(--border);
-	margin-bottom: 1.5rem;
+	gap: 16px;
 }
 
 .brand {
 	display: flex;
 	align-items: center;
-	gap: 0.65rem;
+	gap: 9px;
+	color: var(--text);
+	font-weight: 800;
+	font-size: 16px;
+	letter-spacing: -0.01em;
 }
 
 .brand .logo {
-	width: 36px;
-	height: 36px;
-	border-radius: 9px;
-	background: linear-gradient(135deg, #4f8cff, #a05bff);
+	width: 26px;
+	height: 26px;
+	border-radius: 4px;
+	background: linear-gradient(135deg, var(--gold) 0%, var(--gold-deep) 100%);
 	display: grid;
 	place-items: center;
+	font-weight: 900;
+	font-size: 13px;
+	color: #1c1c1f;
+}
+
+.brand .sub {
+	color: var(--text-dim);
+	font-weight: 500;
+	font-size: 12px;
+	border-left: 1px solid var(--border);
+	padding-left: 9px;
+}
+
+.gnb-nav {
+	display: flex;
+	gap: 4px;
+}
+
+.gnb-nav button {
+	background: transparent;
+	border: none;
+	color: var(--text-muted);
+	font-weight: 700;
+	font-size: 13px;
+	padding: 6px 12px;
+	border-radius: 4px;
+}
+
+.gnb-nav button:hover {
+	color: var(--text);
+	background: var(--surface);
+}
+
+.gnb-nav button.active {
+	color: var(--gold);
+	background: transparent;
+}
+
+.gnb-user {
+	display: flex;
+	align-items: center;
+	gap: 12px;
+	font-size: 13px;
+}
+
+.gnb-user .who {
+	text-align: right;
+	line-height: 1.3;
+}
+
+.gnb-user .who strong {
+	display: block;
+	font-size: 13px;
+}
+
+.gnb-user .who span {
+	color: var(--text-muted);
+	font-size: 12px;
+}
+
+/* ---------------------------------------------------- 레이아웃 */
+
+.shell {
+	max-width: 1180px;
+	margin: 0 auto;
+	padding: 20px 16px 64px;
+}
+
+.page-title {
+	font-size: 22px;
 	font-weight: 800;
-	font-size: 0.95rem;
+	letter-spacing: -0.02em;
+	margin-bottom: 4px;
 }
 
-.brand h1 {
-	font-size: 1.15rem;
-}
-
-.brand p {
-	margin: 0;
-	font-size: 0.78rem;
-	color: var(--muted);
+.page-sub {
+	color: var(--text-muted);
+	font-size: 13px;
+	margin: 0 0 20px;
 }
 
 .grid {
 	display: grid;
-	gap: 1.25rem;
+	gap: 16px;
 }
 
 .grid.two {
-	grid-template-columns: minmax(0, 1fr) minmax(0, 1.35fr);
+	grid-template-columns: minmax(0, 1fr) minmax(0, 2fr);
 }
 
-@media (max-width: 860px) {
+@media (max-width: 900px) {
 	.grid.two {
 		grid-template-columns: minmax(0, 1fr);
 	}
 }
 
 .card {
-	background: var(--panel);
+	background: var(--surface);
 	border: 1px solid var(--border);
-	border-radius: 14px;
-	padding: 1.25rem;
+	border-radius: 4px;
+	padding: 20px;
 }
 
-.card h2 {
-	font-size: 1.05rem;
-	margin-bottom: 1rem;
+.card > h2 {
+	font-size: 15px;
+	font-weight: 800;
+	margin-bottom: 16px;
+	letter-spacing: -0.01em;
 }
 
-.card h3 {
-	font-size: 0.9rem;
-	margin-bottom: 0.6rem;
-	color: var(--muted);
-	font-weight: 600;
+.card > h3 {
+	font-size: 12px;
+	font-weight: 700;
+	color: var(--text-muted);
+	margin: 0 0 8px;
+	text-transform: uppercase;
+	letter-spacing: 0.04em;
 }
 
-.tabs {
+/* ---------------------------------------------------- 통계 카드 */
+
+.stat-row {
+	display: grid;
+	grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+	gap: 12px;
+	margin-bottom: 16px;
+}
+
+.stat {
+	background: var(--surface-2);
+	border: 1px solid var(--border);
+	border-radius: 4px;
+	padding: 14px 16px;
+}
+
+.stat .value {
+	font-size: 26px;
+	font-weight: 800;
+	font-variant-numeric: tabular-nums;
+	letter-spacing: -0.02em;
+	display: block;
+}
+
+.stat .label {
+	font-size: 11px;
+	font-weight: 700;
+	color: var(--text-muted);
+	text-transform: uppercase;
+	letter-spacing: 0.04em;
+}
+
+/* ---------------------------------------------------- 테이블 (op.gg 리스트) */
+
+.rank-list {
 	display: flex;
-	gap: 0.5rem;
-	margin-bottom: 1.25rem;
-	flex-wrap: wrap;
+	flex-direction: column;
 }
 
-.tabs button {
-	background: transparent;
-	border-color: transparent;
-	color: var(--muted);
+.rank-list__head,
+.rank-list__row {
+	display: grid;
+	grid-template-columns: 46px minmax(0, 1fr) 128px 92px;
+	align-items: center;
+	gap: 12px;
+	padding: 11px 12px;
 }
 
-.tabs button.active {
-	background: var(--accent-soft);
-	border-color: var(--accent);
-	color: var(--text);
-}
-
-table {
-	width: 100%;
-	border-collapse: collapse;
-	font-size: 0.9rem;
-}
-
-th {
-	text-align: left;
-	font-size: 0.76rem;
+.rank-list__head {
+	font-size: 11px;
+	font-weight: 700;
+	color: var(--text-muted);
 	text-transform: uppercase;
 	letter-spacing: 0.05em;
-	color: var(--muted);
-	font-weight: 600;
-	padding: 0.5rem 0.6rem;
 	border-bottom: 1px solid var(--border);
 }
 
-td {
-	padding: 0.65rem 0.6rem;
-	border-bottom: 1px solid rgba(38, 48, 73, 0.6);
+.rank-list__row {
+	border-bottom: 1px solid rgba(49, 60, 72, 0.55);
+	transition: background 0.12s;
 }
 
-tbody tr:last-child td {
+.rank-list__row:last-child {
 	border-bottom: none;
 }
 
-tbody tr.me {
-	background: var(--accent-soft);
+.rank-list__row:hover {
+	background: var(--surface-2);
 }
 
-.rank-num {
+.rank-list__row.is-me {
+	background: rgba(83, 131, 232, 0.12);
+	box-shadow: inset 3px 0 0 var(--accent);
+}
+
+.rank-list__row.is-me:hover {
+	background: rgba(83, 131, 232, 0.18);
+}
+
+.rk {
+	font-size: 15px;
+	font-weight: 800;
 	font-variant-numeric: tabular-nums;
-	font-weight: 700;
-	color: var(--muted);
-	width: 2.5rem;
+	color: var(--text-dim);
+	text-align: center;
 }
 
-.rank-1 {
-	color: var(--gold);
+.rk.rk-1 {
+	color: #ffd24a;
 }
-.rank-2 {
-	color: var(--silver);
+.rk.rk-2 {
+	color: #d6dde6;
 }
-.rank-3 {
-	color: var(--bronze);
+.rk.rk-3 {
+	color: #cd8b5c;
 }
 
-.badge {
-	display: inline-block;
-	padding: 0.15rem 0.5rem;
-	border-radius: 999px;
-	font-size: 0.75rem;
+.nick {
 	font-weight: 700;
-	background: var(--panel-2);
-	border: 1px solid var(--border);
+	font-size: 14px;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.nick .me-tag {
+	font-size: 10px;
+	font-weight: 800;
+	color: var(--accent);
+	border: 1px solid var(--accent);
+	border-radius: 2px;
+	padding: 1px 4px;
+	margin-left: 6px;
+	vertical-align: 2px;
+}
+
+/* 티어 뱃지: op.gg처럼 어두운 배경 + 색상 텍스트 + 왼쪽 색 바 */
+.tier {
+	display: inline-flex;
+	align-items: center;
+	gap: 7px;
+	padding: 4px 9px 4px 7px;
+	border-radius: 3px;
+	background: var(--surface-3);
+	border-left: 3px solid currentColor;
+	font-size: 12px;
+	font-weight: 700;
+	white-space: nowrap;
+}
+
+.tier .div {
+	color: var(--text-muted);
+	font-weight: 500;
 }
 
 .tier-IRON {
-	color: #a8b3c7;
+	color: var(--tier-iron);
 }
 .tier-BRONZE {
-	color: var(--bronze);
+	color: var(--tier-bronze);
 }
 .tier-SILVER {
-	color: var(--silver);
+	color: var(--tier-silver);
 }
 .tier-GOLD {
-	color: var(--gold);
+	color: var(--tier-gold);
 }
 .tier-PLATINUM {
-	color: #4fd1c5;
+	color: var(--tier-platinum);
 }
 .tier-EMERALD {
-	color: #38d39f;
+	color: var(--tier-emerald);
 }
 .tier-DIAMOND {
-	color: #74a9ff;
+	color: var(--tier-diamond);
 }
 .tier-MASTER {
-	color: #c77dff;
+	color: var(--tier-master);
 }
 .tier-GRANDMASTER {
-	color: #ff7b7b;
+	color: var(--tier-grandmaster);
 }
 .tier-CHALLENGER {
-	color: #ffd700;
+	color: var(--tier-challenger);
+}
+
+.lp {
+	text-align: right;
+	font-variant-numeric: tabular-nums;
+	font-weight: 700;
+	font-size: 13px;
+	color: var(--text);
+}
+
+.lp .unit {
+	font-size: 11px;
+	color: var(--text-muted);
+	font-weight: 500;
+}
+
+/* ---------------------------------------------------- 폼 */
+
+.hint {
+	color: var(--text-muted);
+	font-size: 12px;
+	margin: 6px 0 0;
+}
+
+.error {
+	background: rgba(232, 64, 87, 0.12);
+	border: 1px solid rgba(232, 64, 87, 0.45);
+	color: #ff9aa8;
+	padding: 10px 12px;
+	border-radius: 4px;
+	font-size: 13px;
+	margin-bottom: 16px;
+}
+
+.notice {
+	background: rgba(0, 187, 163, 0.12);
+	border: 1px solid rgba(0, 187, 163, 0.45);
+	color: #6fe3d1;
+	padding: 10px 12px;
+	border-radius: 4px;
+	font-size: 13px;
+	margin-bottom: 16px;
+}
+
+.notice code {
+	font-weight: 800;
+	color: #fff;
+	letter-spacing: 0.06em;
 }
 
 .row {
 	display: flex;
-	gap: 0.6rem;
+	gap: 10px;
 }
 
 .row > * {
 	flex: 1;
 }
 
-.muted {
-	color: var(--muted);
-	font-size: 0.85rem;
-}
-
-.stat {
+.tabs {
 	display: flex;
-	flex-direction: column;
-	gap: 0.15rem;
-	margin-bottom: 1rem;
+	gap: 2px;
+	margin-bottom: 20px;
+	border-bottom: 1px solid var(--border);
 }
 
-.stat .value {
-	font-size: 1.6rem;
-	font-weight: 800;
-	font-variant-numeric: tabular-nums;
+.tabs button {
+	background: transparent;
+	border: none;
+	border-bottom: 2px solid transparent;
+	border-radius: 0;
+	color: var(--text-muted);
+	font-weight: 700;
+	font-size: 13px;
+	padding: 9px 14px;
 }
 
-.stat .label {
-	font-size: 0.78rem;
-	color: var(--muted);
+.tabs button:hover {
+	color: var(--text);
+	background: transparent;
 }
 
-.school-list {
-	display: flex;
-	flex-direction: column;
-	gap: 0.5rem;
-}
-
-.school-item {
-	display: flex;
-	justify-content: space-between;
-	align-items: center;
-	gap: 0.75rem;
-	padding: 0.7rem 0.85rem;
-	background: var(--panel-2);
-	border: 1px solid var(--border);
-	border-radius: 10px;
-	font-size: 0.9rem;
-}
-
-.school-item.selected {
-	border-color: var(--accent);
-	background: var(--accent-soft);
-}
-
-.school-item button {
-	padding: 0.35rem 0.7rem;
-	font-size: 0.8rem;
+.tabs button.active {
+	color: var(--gold);
+	border-bottom-color: var(--gold);
 }
 
 .empty {
-	color: var(--muted);
-	font-size: 0.9rem;
-	padding: 1.5rem 0;
+	color: var(--text-muted);
+	font-size: 13px;
+	padding: 40px 0;
 	text-align: center;
+}
+
+.empty strong {
+	display: block;
+	color: var(--text);
+	font-size: 15px;
+	margin-bottom: 6px;
+}
+
+/* ---------------------------------------------------- 학교 정보 패널 */
+
+.school-panel {
+	background: linear-gradient(135deg, var(--surface) 0%, var(--surface-2) 100%);
+	border: 1px solid var(--border);
+	border-radius: 4px;
+	padding: 20px;
+	margin-bottom: 16px;
+}
+
+.school-panel .name {
+	font-size: 19px;
+	font-weight: 800;
+	letter-spacing: -0.02em;
+}
+
+.school-panel .meta {
+	color: var(--text-muted);
+	font-size: 12px;
+	margin-top: 2px;
 }
