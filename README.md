@@ -27,7 +27,8 @@ npm run dev                      # http://localhost:5173
 Riot API 없이 테스트하려면 목 서버를 함께 띄운다.
 
 ```bash
-npm run dev:mock                 # 목 Riot API + dev 서버 동시 실행
+npm run setup:local   # wrangler.local.json 생성 (최초 1회)
+npm run dev:mock      # 목 Riot API + dev 서버 동시 실행
 ```
 
 목 서버는 `scripts/run-with-mock.mjs`가 Vite dev 서버와 같은 프로세스 트리에서 관리한다.
@@ -48,10 +49,30 @@ npm run dev:mock                 # 목 Riot API + dev 서버 동시 실행
 | 이름 | 용도 | 설정 위치 |
 |---|---|---|
 | `RIOT_API_KEY` | Riot API 키 (비밀) | `.dev.vars` (로컬) / `wrangler secret put RIOT_API_KEY` (배포) |
-| `RIOT_API_BASE` | Riot API 베이스 URL | `wrangler.json`의 `vars` |
+| `RIOT_API_BASE` | Riot API 베이스 URL | `wrangler.json`의 `vars` (운영) / `wrangler.local.json`의 `vars` (로컬) |
 
-`RIOT_API_BASE`는 `wrangler.json`의 `vars`에 둔다. `.dev.vars`는 secrets 경로로만 로드되므로
-같은 이름의 vars를 덮어쓰지 못한다. 로컬에서 목 서버를 쓸 때는 `wrangler.local.json`을 사용한다.
+### 주의: `.dev.vars` 와 `vars` 는 같은 이름을 공유할 수 없다
+
+`.dev.vars` 는 **secrets 경로**로 로드되고, `wrangler.json` 의 `vars` 는 **vars 경로**로 로드된다.
+같은 이름(예: `RIOT_API_BASE`)을 양쪽에 정의하면 `.dev.vars` 쪽 값이 이기고,
+`wrangler.local.json` 의 `vars` 설정이 무시된다.
+
+따라서 **`RIOT_API_BASE` 는 `.dev.vars` 에 절대 넣지 않는다.** `vars` 에만 정의한다.
+
+### workerd 는 사설 IP fetch 를 차단한다
+
+Workers 런타임은 `127.0.0.1`, `172.x.x.x` 같은 사설/루프백 주소로의 `fetch` 를 차단한다
+(`internal error; reference = ...` 로 실패한다). 로컬 목 서버에 직접 붙으면 연결할 수 없다.
+
+해결책: Vite dev 서버가 중계하도록 프록시를 둔다.
+
+```
+Worker → http://127.0.0.1:5173/mock-riot/...  (Vite dev server)
+       → http://127.0.0.1:8787/...              (목 Riot API 서버)
+```
+
+`vite.config.ts` 의 `server.proxy` 와 `wrangler.local.json` 의 `RIOT_API_BASE` 가 이 경로를 구성한다.
+`server.host: "127.0.0.1"` 설정이 있어야 IPv4 로 접근된다(기본은 IPv6 `::1` 만).
 
 ## 배포
 

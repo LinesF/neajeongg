@@ -128,11 +128,13 @@ const accountMatch = url.pathname.match(
 mockServer.listen(MOCK_PORT, "0.0.0.0", () => {
 	console.log(`[mock-riot] listening on http://0.0.0.0:${MOCK_PORT}`);
 
-	const vite = spawn("npx", ["vite"], {
+	// npx는 Windows에서 .cmd라 shell:true가 필요하다(보안 경고 발생).
+	// vite의 엔트리 JS를 node로 직접 실행하면 shell 없이 안전하게 띄울 수 있다.
+	const viteBin = path.join(projectRoot, "node_modules", "vite", "bin", "vite.js");
+	const vite = spawn(process.execPath, [viteBin], {
 		cwd: projectRoot,
 		stdio: "inherit",
 		env: { ...process.env, CF_LOCAL_CONFIG: "1" },
-		shell: true,
 	});
 
 	const shutdown = () => {

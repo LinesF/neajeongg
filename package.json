@@ -47,7 +47,8 @@
     "db:migrate:local": "wrangler d1 migrations apply DB --local",
     "db:migrate:remote": "wrangler d1 migrations apply DB --remote",
     "typecheck": "tsc -b",
-    "dev:mock": "node scripts/run-with-mock.mjs"
+    "dev:mock": "node scripts/run-with-mock.mjs",
+    "setup:local": "node scripts/setup-local.mjs"
   },
   "type": "module",
   "allowScripts": {
